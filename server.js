@@ -397,21 +397,62 @@ if (lineConfig.channelAccessToken && lineConfig.channelSecret) {
   app.post('/line/webhook', lineMiddleware(lineConfig), async (req, res) => {
     const events = req.body.events || [];
 
-    const results = await Promise.all(events.map(async (event) => {
-      if (event.type === 'follow' && event.replyToken) {
-        const tid = `direct-${Date.now()}`;
-        const liffLink = buildLiffUrl(tid);
-        const message = {
-          type: 'text',
-          text: liffLink
-            ? `ขอบคุณที่แอด LINE OA ของเรา\nกดลิงก์นี้เพื่อลงทะเบียน: ${liffLink}`
-            : 'ขอบคุณที่แอด LINE OA ของเรา',
+    async function upsertLineUser(lineUserId) {
+      if (!lineUserId) return;
+      try {
+        const profile = await lineClient.getProfile(lineUserId);
+        const payload = {
+          line_user_id: profile.userId,
+          line_display_name: sanitize(profile.displayName, 255),
+          line_picture: sanitize(profile.pictureUrl, 500),
+          line_status_message: sanitize(profile.statusMessage, 500),
         };
-        try {
-          await lineClient.replyMessage(event.replyToken, message);
-        } catch (err) {
-          console.error('LINE reply error', err.originalError || err);
+        const existing = selectLeadByLineUserId.get(lineUserId);
+        if (existing) {
+          updateLeadWithLineById.run({ id: existing.id, tracking_id: existing.tracking_id, ...payload });
+          console.log(`[WEBHOOK] updated profile for line_user_id=${lineUserId}`);
+        } else {
+          insertLead.run({
+            id: uuidv4(),
+            tracking_id: `direct-${Date.now()}`,
+            utm_source: null, utm_medium: null, utm_campaign: null, utm_term: null, utm_content: null,
+            source_url: null, user_agent: null, ip: null,
+            line_user_id: payload.line_user_id,
+            line_display_name: payload.line_display_name,
+            line_picture: payload.line_picture,
+            line_status_message: payload.line_status_message,
+            linked_at: new Date().toISOString(),
+          });
+          console.log(`[WEBHOOK] inserted new lead for line_user_id=${lineUserId}`);
         }
+      } catch (err) {
+        console.error(`[WEBHOOK] failed to upsert profile for line_user_id=${lineUserId}`, err.originalError || err);
+      }
+    }
+
+    const results = await Promise.all(events.map(async (event) => {
+      const lineUserId = event.source && event.source.userId;
+
+      if (event.type === 'follow') {
+        await upsertLineUser(lineUserId);
+        if (event.replyToken) {
+          const existing = lineUserId ? selectLeadByLineUserId.get(lineUserId) : null;
+          const tid = (existing && existing.tracking_id) || `direct-${Date.now()}`;
+          const liffLink = buildLiffUrl(tid);
+          const message = {
+            type: 'text',
+            text: liffLink
+              ? `ขอบคุณที่แอด LINE OA ของเรา\nกดลิงก์นี้เพื่อลงทะเบียน: ${liffLink}`
+              : 'ขอบคุณที่แอด LINE OA ของเรา',
+          };
+          try {
+            await lineClient.replyMessage(event.replyToken, message);
+          } catch (err) {
+            console.error('LINE reply error', err.originalError || err);
+          }
+        }
+      } else if (event.type === 'message' && lineUserId) {
+        await upsertLineUser(lineUserId);
       }
     }));
 
