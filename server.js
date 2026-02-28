@@ -14,6 +14,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 const ALLOW_ALL_ORIGINS = ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes('*');
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || '';
 
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -25,6 +27,9 @@ if (!lineConfig.channelAccessToken || !lineConfig.channelSecret) {
 }
 if (!LIFF_ID) {
   console.warn('[WARN] LIFF_ID is missing; liffUrl responses will be blank until set.');
+}
+if (!ADMIN_PASS) {
+  console.warn('[WARN] ADMIN_PASS is empty; admin panel will be unprotected until set.');
 }
 
 // --- Express setup ---
@@ -132,6 +137,7 @@ const updateLeadWithLine = db.prepare(`
 `);
 
 const selectLeadByTracking = db.prepare('SELECT * FROM leads WHERE tracking_id = ?');
+const selectAllLeads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC');
 
 // --- Helpers ---
 function sanitize(input, max = 255) {
@@ -144,6 +150,17 @@ function buildLiffUrl(trackingId) {
   return `https://liff.line.me/${LIFF_ID}?tid=${encodeURIComponent(trackingId)}`;
 }
 
+function requireAdmin(req, res, next) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Basic ')) {
+    return res.status(401).set('WWW-Authenticate', 'Basic realm=\"admin\"').send('Auth required');
+  }
+  const decoded = Buffer.from(header.split(' ')[1], 'base64').toString();
+  const [user, pass] = decoded.split(':');
+  if (user === ADMIN_USER && pass === ADMIN_PASS) return next();
+  return res.status(401).set('WWW-Authenticate', 'Basic realm=\"admin\"').send('Invalid credentials');
+}
+
 // --- Routes ---
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -151,6 +168,91 @@ app.get('/health', (req, res) => {
 
 app.get('/api/config', (req, res) => {
   res.json({ liffId: LIFF_ID });
+});
+
+// --- Admin panel ---
+app.get('/admin', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.send(`<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin | Leads</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { padding: 16px 20px; background: #111827; border-bottom: 1px solid #1f2937; }
+    h1 { margin: 0; font-size: 18px; }
+    main { padding: 20px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #1f2937; }
+    th { text-align: left; background: #111827; position: sticky; top: 0; z-index: 1; }
+    tr:nth-child(even) { background: #0b1220; }
+    code { font-size: 12px; color: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <header><h1>Leads dashboard</h1></header>
+  <main>
+    <div id="meta">Loading...</div>
+    <table id="grid" hidden>
+      <thead>
+        <tr>
+          <th>Created</th><th>Tracking</th><th>UTM Source</th><th>UTM Medium</th><th>UTM Campaign</th><th>UTM Term</th><th>UTM Content</th><th>LINE User</th><th>Name</th><th>Linked</th><th>Source URL</th><th>IP</th><th>User Agent</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script>
+    async function loadData() {
+      const res = await fetch('/admin/data');
+      if (!res.ok) throw new Error('โหลดข้อมูลไม่ได้');
+      return res.json();
+    }
+    function fmt(d) { return d ? new Date(d).toLocaleString('th-TH') : ''; }
+    function render(rows) {
+      const tbody = document.querySelector('#grid tbody');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = \`
+          <td>${fmt(r.created_at)}</td>
+          <td><code>${r.tracking_id || ''}</code></td>
+          <td>${r.utm_source || ''}</td>
+          <td>${r.utm_medium || ''}</td>
+          <td>${r.utm_campaign || ''}</td>
+          <td>${r.utm_term || ''}</td>
+          <td>${r.utm_content || ''}</td>
+          <td><code>${r.line_user_id || ''}</code></td>
+          <td>${r.line_display_name || ''}</td>
+          <td>${fmt(r.linked_at)}</td>
+          <td>${r.source_url || ''}</td>
+          <td>${r.ip || ''}</td>
+          <td>${r.user_agent || ''}</td>
+        \`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('grid').hidden = false;
+      document.getElementById('meta').textContent = \`ทั้งหมด \${rows.length} รายการ\`;
+    }
+    loadData().then(render).catch(err => {
+      document.getElementById('meta').textContent = err.message || 'error';
+    });
+  </script>
+</body>
+</html>`);
+});
+
+app.get('/admin/data', requireAdmin, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const rows = selectAllLeads.all();
+    return res.json(rows);
+  } catch (err) {
+    console.error('Admin fetch error', err);
+    return res.status(500).json({ message: 'Failed to load data' });
+  }
 });
 
 // Serve landing page at root
