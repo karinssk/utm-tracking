@@ -39,7 +39,16 @@
     }
 
     async function bootstrap() {
+      // If this page was loaded by LIFF's external-browser redirect, the URL will
+      // contain ?liff.state=... — that means the LIFF login flow is in progress
+      // and the root URL is being used as the LIFF endpoint.
+      // Forward immediately to liff.html so the LIFF SDK can complete the link
+      // without creating a duplicate visit record.
       const search = new URLSearchParams(window.location.search);
+      if (search.has('liff.state')) {
+        window.location.replace('/liff.html' + window.location.search + window.location.hash);
+        return;
+      }
       const payload = {
         utm_source: search.get('utm_source') || undefined,
         utm_medium: search.get('utm_medium') || undefined,
