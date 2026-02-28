@@ -73,10 +73,10 @@
     async function main() {
       try {
         setStatus('กำลังตรวจสอบการล็อกอิน...', 'loading');
-        const { liffId } = await fetchConfig();
-        if (!liffId) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
+        const config = await fetchConfig();
+        if (!config.liffId) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
 
-        const logged = await ensureLogin(liffId);
+        const logged = await ensureLogin(config.liffId);
         if (!logged) return; // login redirect
 
         // Must read tid AFTER liff.init() — in external browser, LIFF encodes
@@ -84,7 +84,13 @@
         const trackingId = getTrackingId();
         setStatus('กำลังเชื่อมบัญชีของคุณ...', 'loading');
         await linkProfile(trackingId);
-        setStatus('เชื่อมสำเร็จ! ขอบคุณที่ร่วมเป็นเพื่อนกับเรา', 'success');
+        setStatus('เชื่อมสำเร็จ! กำลังพาไปยัง LINE OA...', 'success');
+
+        // Navigate to LINE OA so user can add friend (if not yet) — seamless inside LINE app
+        if (config.lineOaId) {
+          const addFriendUrl = `https://line.me/R/ti/p/${encodeURIComponent(config.lineOaId)}`;
+          setTimeout(() => { window.location.href = addFriendUrl; }, 1000);
+        }
       } catch (err) {
         console.error(err);
         setStatus(err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
