@@ -5,7 +5,7 @@ const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 const Database = require('better-sqlite3');
 const { Client, middleware: lineMiddleware } = require('@line/bot-sdk');
-requie('dotenv') = require('dotenv').config();
+require('dotenv').config();
 
 const PORT = process.env.PORT || 3000;
 const LIFF_ID = process.env.LIFF_ID || '';
