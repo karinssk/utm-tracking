@@ -72,7 +72,6 @@
 
     async function main() {
       try {
-        const trackingId = getTrackingId();
         setStatus('กำลังตรวจสอบการล็อกอิน...', 'loading');
         const { liffId } = await fetchConfig();
         if (!liffId) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
@@ -80,6 +79,9 @@
         const logged = await ensureLogin(liffId);
         if (!logged) return; // login redirect
 
+        // Must read tid AFTER liff.init() — in external browser, LIFF encodes
+        // query params inside liff.state and only decodes them into the URL after init.
+        const trackingId = getTrackingId();
         setStatus('กำลังเชื่อมบัญชีของคุณ...', 'loading');
         await linkProfile(trackingId);
         setStatus('เชื่อมสำเร็จ! ขอบคุณที่ร่วมเป็นเพื่อนกับเรา', 'success');
