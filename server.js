@@ -30,7 +30,14 @@ if (!LIFF_ID) {
 // --- Express setup ---
 const app = express();
 app.set('trust proxy', true);
-app.use(express.json());
+
+// Use JSON body parser for all routes EXCEPT /line/webhook (LINE SDK handles raw body itself)
+const jsonParser = express.json();
+app.use((req, res, next) => {
+  if (req.path === '/line/webhook') return next();
+  return jsonParser(req, res, next);
+});
+
 // Log every request with status and latency
 app.use((req, res, next) => {
   const start = Date.now();
@@ -244,6 +251,7 @@ app.post('/api/link', (req, res) => {
 if (lineConfig.channelAccessToken && lineConfig.channelSecret) {
   const lineClient = new Client(lineConfig);
 
+  // LINE webhook expects raw body for signature verification; middleware must be the first handler for this route
   app.post('/line/webhook', lineMiddleware(lineConfig), async (req, res) => {
     const events = req.body.events || [];
 
