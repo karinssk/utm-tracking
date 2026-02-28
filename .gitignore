@@ -3,3 +3,4 @@ npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 data/tracking.db
+.env
