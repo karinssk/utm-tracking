@@ -10,7 +10,7 @@
     h1 { margin-top: 0; font-size: 22px; color: #0f172a; }
     p { color: #334155; line-height: 1.6; }
     .pill { display: inline-block; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 12px; font-size: 13px; margin-bottom: 12px; }
-    button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: linear-gradient(135deg,#22c55e,#16a34a); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 30px rgba(34,197,94,0.3); }
+    button, .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; background: linear-gradient(135deg,#22c55e,#16a34a); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 30px rgba(34,197,94,0.3); text-align: center; text-decoration: none; box-sizing: border-box; }
     button:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
     .status { margin-top: 14px; font-size: 14px; color: #0f172a; }
     .muted { color: #64748b; font-size: 13px; }
@@ -58,9 +58,12 @@
         const data = await res.json();
         if (!data.liffUrl) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
 
-        cta.disabled = false;
-        cta.textContent = 'เปิดใน LINE';
-        cta.onclick = () => { window.location.href = data.liffUrl; };
+        // Replace <button> with <a> so mobile browsers open LINE app reliably
+        const anchor = document.createElement('a');
+        anchor.href = data.liffUrl;
+        anchor.textContent = 'เปิดใน LINE';
+        anchor.className = 'btn';
+        cta.parentNode.replaceChild(anchor, cta);
         statusEl.textContent = 'พร้อมแล้ว คลิกเพื่อดำเนินการต่อใน LINE';
       } catch (err) {
         console.error(err);
