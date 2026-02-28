@@ -216,25 +216,25 @@ app.get('/admin', requireAdmin, (req, res) => {
       tbody.innerHTML = '';
       rows.forEach(r => {
         const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td>${fmt(r.created_at)}</td>
-          <td><code>${r.tracking_id || ''}</code></td>
-          <td>${r.utm_source || ''}</td>
-          <td>${r.utm_medium || ''}</td>
-          <td>${r.utm_campaign || ''}</td>
-          <td>${r.utm_term || ''}</td>
-          <td>${r.utm_content || ''}</td>
-          <td><code>${r.line_user_id || ''}</code></td>
-          <td>${r.line_display_name || ''}</td>
-          <td>${fmt(r.linked_at)}</td>
-          <td>${r.source_url || ''}</td>
-          <td>${r.ip || ''}</td>
-          <td>${r.user_agent || ''}</td>
-        \`;
+        tr.innerHTML = [
+          '<td>', fmt(r.created_at), '</td>',
+          '<td><code>', (r.tracking_id || ''), '</code></td>',
+          '<td>', (r.utm_source || ''), '</td>',
+          '<td>', (r.utm_medium || ''), '</td>',
+          '<td>', (r.utm_campaign || ''), '</td>',
+          '<td>', (r.utm_term || ''), '</td>',
+          '<td>', (r.utm_content || ''), '</td>',
+          '<td><code>', (r.line_user_id || ''), '</code></td>',
+          '<td>', (r.line_display_name || ''), '</td>',
+          '<td>', fmt(r.linked_at), '</td>',
+          '<td>', (r.source_url || ''), '</td>',
+          '<td>', (r.ip || ''), '</td>',
+          '<td>', (r.user_agent || ''), '</td>'
+        ].join('');
         tbody.appendChild(tr);
       });
       document.getElementById('grid').hidden = false;
-      document.getElementById('meta').textContent = \`ทั้งหมด \${rows.length} รายการ\`;
+      document.getElementById('meta').textContent = 'ทั้งหมด ' + rows.length + ' รายการ';
     }
     loadData().then(render).catch(err => {
       document.getElementById('meta').textContent = err.message || 'error';
