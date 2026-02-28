@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>เริ่มต้นรับสิทธิ์ผ่าน LINE</title>
+  <style>
+    body { font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; background: linear-gradient(135deg,#0ea5e9,#6366f1); color: #0f172a; }
+    .card { max-width: 440px; margin: 48px auto; background: #fff; border-radius: 18px; padding: 28px; box-shadow: 0 20px 60px rgba(15,23,42,0.2); }
+    h1 { margin-top: 0; font-size: 22px; color: #0f172a; }
+    p { color: #334155; line-height: 1.6; }
+    .pill { display: inline-block; background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 12px; font-size: 13px; margin-bottom: 12px; }
+    button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: linear-gradient(135deg,#22c55e,#16a34a); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 12px 30px rgba(34,197,94,0.3); }
+    button:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; }
+    .status { margin-top: 14px; font-size: 14px; color: #0f172a; }
+    .muted { color: #64748b; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="pill">ขั้นตอนที่ 1/2</span>
+    <h1>กดปุ่มเพื่อเปิดใน LINE</h1>
+    <p>ระบบจะผูกข้อมูลโฆษณา (UTM) เข้ากับบัญชี LINE ของคุณ เพื่อให้ทีมมาร์เก็ตติ้งวัดผลแคมเปญได้แม่นยำ</p>
+    <button id="cta" disabled>กำลังเตรียมลิงก์...</button>
+    <div class="status" id="status"></div>
+    <p class="muted">หากปุ่มไม่ทำงาน ให้ลองรีเฟรชหรือเปิดผ่านเบราว์เซอร์ในมือถือ</p>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const cta = document.getElementById('cta');
+
+    function paramsToObject(params) {
+      const obj = {};
+      params.forEach((v, k) => { obj[k] = v; });
+      return obj;
+    }
+
+    async function bootstrap() {
+      const search = new URLSearchParams(window.location.search);
+      const payload = {
+        utm_source: search.get('utm_source') || undefined,
+        utm_medium: search.get('utm_medium') || undefined,
+        utm_campaign: search.get('utm_campaign') || undefined,
+        utm_term: search.get('utm_term') || undefined,
+        utm_content: search.get('utm_content') || undefined,
+        source_url: window.location.href,
+      };
+
+      try {
+        const res = await fetch('/api/visit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) throw new Error('ไม่สามารถบันทึกข้อมูลได้');
+        const data = await res.json();
+        if (!data.liffUrl) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
+
+        cta.disabled = false;
+        cta.textContent = 'เปิดใน LINE';
+        cta.onclick = () => { window.location.href = data.liffUrl; };
+        statusEl.textContent = 'พร้อมแล้ว คลิกเพื่อดำเนินการต่อใน LINE';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+        cta.disabled = true;
+        cta.textContent = 'ไม่สามารถสร้างลิงก์ได้';
+      }
+    }
+
+    bootstrap();
+  </script>
+</body>
+</html>

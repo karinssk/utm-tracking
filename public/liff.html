@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>เชื่อมบัญชี LINE</title>
+  <style>
+    body { font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .box { background: #111827; border: 1px solid #1f2937; border-radius: 16px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 24px 60px rgba(0,0,0,0.35); }
+    h1 { margin: 0 0 12px; font-size: 22px; }
+    p { margin: 0 0 16px; color: #cbd5e1; line-height: 1.6; }
+    .status { background: #0b1220; border: 1px solid #1f2937; border-radius: 12px; padding: 14px; font-size: 14px; }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+    .loading { color: #eab308; }
+  </style>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+  <div class="box">
+    <h1>กำลังเชื่อมบัญชี LINE</h1>
+    <p>เราจะผูกข้อมูลโฆษณาเข้ากับบัญชี LINE ของคุณ เพื่อให้บริการและโปรโมชันตรงความสนใจ</p>
+    <div id="status" class="status loading">กำลังเตรียมระบบ...</div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+
+    function setStatus(text, state) {
+      statusEl.textContent = text;
+      statusEl.className = `status ${state || ''}`;
+    }
+
+    async function fetchConfig() {
+      const res = await fetch('/api/config');
+      if (!res.ok) throw new Error('โหลดค่า LIFF ไม่ได้');
+      return res.json();
+    }
+
+    async function ensureLogin(liffId) {
+      await liff.init({ liffId, withLoginOnExternalBrowser: true });
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return false; // redirect happening
+      }
+      return true;
+    }
+
+    function getTrackingId() {
+      const tid = new URLSearchParams(window.location.search).get('tid');
+      if (!tid) throw new Error('ไม่พบ tracking id (tid) ในลิงก์');
+      return tid;
+    }
+
+    async function linkProfile(trackingId) {
+      const profile = await liff.getProfile();
+      const payload = {
+        trackingId,
+        lineUserId: profile.userId,
+        displayName: profile.displayName,
+        pictureUrl: profile.pictureUrl,
+        statusMessage: profile.statusMessage,
+      };
+
+      const res = await fetch('/api/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('เชื่อมข้อมูลไม่สำเร็จ');
+    }
+
+    async function main() {
+      try {
+        const trackingId = getTrackingId();
+        setStatus('กำลังตรวจสอบการล็อกอิน...', 'loading');
+        const { liffId } = await fetchConfig();
+        if (!liffId) throw new Error('ยังไม่ได้ตั้งค่า LIFF_ID บนเซิร์ฟเวอร์');
+
+        const logged = await ensureLogin(liffId);
+        if (!logged) return; // login redirect
+
+        setStatus('กำลังเชื่อมบัญชีของคุณ...', 'loading');
+        await linkProfile(trackingId);
+        setStatus('เชื่อมสำเร็จ! ขอบคุณที่ร่วมเป็นเพื่อนกับเรา', 'success');
+      } catch (err) {
+        console.error(err);
+        setStatus(err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
