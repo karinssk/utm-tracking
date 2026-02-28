@@ -138,6 +138,17 @@ const updateLeadWithLine = db.prepare(`
 
 const selectLeadByTracking = db.prepare('SELECT * FROM leads WHERE tracking_id = ?');
 const selectAllLeads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC');
+const selectLeadByLineUserId = db.prepare('SELECT * FROM leads WHERE line_user_id = ? ORDER BY created_at DESC');
+const updateLeadWithLineById = db.prepare(`
+  UPDATE leads SET
+    tracking_id = COALESCE(tracking_id, @tracking_id),
+    line_user_id = @line_user_id,
+    line_display_name = @line_display_name,
+    line_picture = @line_picture,
+    line_status_message = @line_status_message,
+    linked_at = datetime('now')
+  WHERE id = @id
+`);
 
 // --- Helpers ---
 function sanitize(input, max = 255) {
@@ -322,6 +333,35 @@ app.post('/api/link', (req, res) => {
     if (existing) {
       updateLeadWithLine.run(payload);
       console.log(`[LINK] updated tracking_id=${trackingId} line_user_id=${payload.line_user_id || ''}`);
+    } else if (payload.line_user_id) {
+      const byUser = selectLeadByLineUserId.get(payload.line_user_id);
+      if (byUser) {
+        updateLeadWithLineById.run({
+          id: byUser.id,
+          tracking_id: trackingId,
+          ...payload,
+        });
+        console.log(`[LINK] updated existing user line_user_id=${payload.line_user_id} with tracking_id=${trackingId}`);
+      } else {
+        insertLead.run({
+          id: uuidv4(),
+          tracking_id: trackingId,
+          utm_source: null,
+          utm_medium: null,
+          utm_campaign: null,
+          utm_term: null,
+          utm_content: null,
+          source_url: null,
+          user_agent: null,
+          ip: null,
+          line_user_id: payload.line_user_id,
+          line_display_name: payload.line_display_name,
+          line_picture: payload.line_picture,
+          line_status_message: payload.line_status_message,
+          linked_at: new Date().toISOString(),
+        });
+        console.log(`[LINK] inserted new tracking_id=${trackingId} line_user_id=${payload.line_user_id || ''}`);
+      }
     } else {
       insertLead.run({
         id: uuidv4(),
@@ -340,7 +380,7 @@ app.post('/api/link', (req, res) => {
         line_status_message: payload.line_status_message,
         linked_at: new Date().toISOString(),
       });
-      console.log(`[LINK] inserted new tracking_id=${trackingId} line_user_id=${payload.line_user_id || ''}`);
+      console.log(`[LINK] inserted new tracking_id=${trackingId} (no line_user_id provided)`);
     }
   } catch (err) {
     console.error('Failed to link LINE user', err);
