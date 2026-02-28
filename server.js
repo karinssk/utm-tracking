@@ -31,6 +31,15 @@ if (!LIFF_ID) {
 const app = express();
 app.set('trust proxy', true);
 app.use(express.json());
+// Log every request with status and latency
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[REQ] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms ip=${req.ip || ''}`);
+  });
+  next();
+});
 app.use(cors({
   origin(origin, callback) {
     if (ALLOW_ALL_ORIGINS || !origin || ALLOWED_ORIGINS.includes(origin)) {
@@ -168,6 +177,7 @@ app.post('/api/visit', rateLimit, (req, res) => {
 
   try {
     insertLead.run(lead);
+    console.log(`[VISIT] saved tracking_id=${trackingId}`);
   } catch (err) {
     console.error('Failed to insert lead', err);
     return res.status(500).json({ message: 'Failed to save tracking data' });
@@ -202,6 +212,7 @@ app.post('/api/link', (req, res) => {
     const existing = selectLeadByTracking.get(trackingId);
     if (existing) {
       updateLeadWithLine.run(payload);
+      console.log(`[LINK] updated tracking_id=${trackingId} line_user_id=${payload.line_user_id || ''}`);
     } else {
       insertLead.run({
         id: uuidv4(),
@@ -220,6 +231,7 @@ app.post('/api/link', (req, res) => {
         line_status_message: payload.line_status_message,
         linked_at: new Date().toISOString(),
       });
+      console.log(`[LINK] inserted new tracking_id=${trackingId} line_user_id=${payload.line_user_id || ''}`);
     }
   } catch (err) {
     console.error('Failed to link LINE user', err);
