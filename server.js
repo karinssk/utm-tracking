@@ -16,6 +16,7 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
 const ALLOW_ALL_ORIGINS = ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes('*');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || '';
+const LINE_OA_ID = process.env.LINE_OA_ID || ''; // e.g. @mystore (include the @)
 
 const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
@@ -161,6 +162,11 @@ function buildLiffUrl(trackingId) {
   return `https://liff.line.me/${LIFF_ID}?tid=${encodeURIComponent(trackingId)}`;
 }
 
+function buildAddFriendUrl(trackingId) {
+  if (!LINE_OA_ID) return '';
+  return `https://line.me/R/ti/p/${encodeURIComponent(LINE_OA_ID)}?ref=${encodeURIComponent(trackingId)}`;
+}
+
 function requireAdmin(req, res, next) {
   const header = req.headers.authorization || '';
   if (!header.startsWith('Basic ')) {
@@ -178,7 +184,7 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ liffId: LIFF_ID });
+  res.json({ liffId: LIFF_ID, lineOaId: LINE_OA_ID });
 });
 
 // --- Admin panel ---
@@ -304,7 +310,8 @@ app.post('/api/visit', rateLimit, (req, res) => {
   }
 
   const liffUrl = buildLiffUrl(trackingId);
-  return res.json({ trackingId, liffUrl });
+  const addFriendUrl = buildAddFriendUrl(trackingId);
+  return res.json({ trackingId, liffUrl, addFriendUrl });
 });
 
 app.post('/api/link', (req, res) => {
@@ -434,10 +441,28 @@ if (lineConfig.channelAccessToken && lineConfig.channelSecret) {
       const lineUserId = event.source && event.source.userId;
 
       if (event.type === 'follow') {
-        await upsertLineUser(lineUserId);
+        const refTrackingId = event.referral && event.referral.ref;
+        if (refTrackingId && lineUserId) {
+          // User added friend via tracked URL — link profile to the UTM record directly
+          try {
+            const profile = await lineClient.getProfile(lineUserId);
+            updateLeadWithLine.run({
+              tracking_id: refTrackingId,
+              line_user_id: profile.userId,
+              line_display_name: sanitize(profile.displayName, 255),
+              line_picture: sanitize(profile.pictureUrl, 500),
+              line_status_message: sanitize(profile.statusMessage, 500),
+            });
+            console.log(`[WEBHOOK] follow ref linked tracking_id=${refTrackingId} line_user_id=${lineUserId}`);
+          } catch (err) {
+            console.error('[WEBHOOK] failed to link via ref', err.originalError || err);
+          }
+        } else {
+          await upsertLineUser(lineUserId);
+        }
         if (event.replyToken) {
           const existing = lineUserId ? selectLeadByLineUserId.get(lineUserId) : null;
-          const tid = (existing && existing.tracking_id) || `direct-${Date.now()}`;
+          const tid = (existing && existing.tracking_id) || refTrackingId || `direct-${Date.now()}`;
           const liffLink = buildLiffUrl(tid);
           const message = {
             type: 'text',
