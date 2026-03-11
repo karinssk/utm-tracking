@@ -383,7 +383,7 @@ export default function SendMessagePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button
                     type="button"
-                    onClick={handleEditCode}
+                    onClick={() => handleEditCode()}
                     title="แก้ไขรหัสลูกค้า"
                     style={{ background: 'transparent', border: '1px solid #aacfb5', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#2e7d32' }}
                   >
