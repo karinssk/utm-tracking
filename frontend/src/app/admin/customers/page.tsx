@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 
 interface Customer {
   id: number;
@@ -24,9 +25,6 @@ export default function CustomersPage() {
   const [date, setDate] = useState('');
   const [utmSource, setUtmSource] = useState('');
   const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingCode, setEditingCode] = useState('');
-  const [saving, setSaving] = useState(false);
 
   function load(p = page) {
     setLoading(true);
@@ -47,39 +45,46 @@ export default function CustomersPage() {
 
   const totalPages = Math.ceil(total / 50);
 
-  function startEdit(e: React.MouseEvent, c: Customer) {
+  async function handleEditCode(e: React.MouseEvent, c: Customer) {
     e.stopPropagation();
-    setEditingId(c.id);
-    setEditingCode(c.customer_code);
-  }
+    const result = await Swal.fire({
+      title: 'แก้ไขรหัสลูกค้า',
+      html: `<div style="font-size:13px;color:#546e7a;margin-bottom:8px">${c.display_name || '-'}</div>`,
+      input: 'text',
+      inputValue: c.customer_code,
+      inputLabel: 'รหัสลูกค้า',
+      inputPlaceholder: 'เช่น JWD/000001',
+      showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#0b57b7',
+      cancelButtonColor: '#8a94a4',
+      reverseButtons: true,
+      didOpen: () => {
+        const input = Swal.getInput();
+        if (input) input.addEventListener('input', () => { input.value = input.value.toUpperCase(); });
+      },
+      preConfirm: (value: string) => {
+        if (!value?.trim()) { Swal.showValidationMessage('กรุณาใส่รหัสลูกค้า'); return false; }
+        return value.trim().toUpperCase();
+      },
+    });
 
-  function cancelEdit(e: React.MouseEvent) {
-    e.stopPropagation();
-    setEditingId(null);
-    setEditingCode('');
-  }
+    if (!result.isConfirmed || !result.value) return;
 
-  async function saveCode(e: React.MouseEvent, id: number) {
-    e.stopPropagation();
-    if (!editingCode.trim()) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/customers/${id}/code`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ customer_code: editingCode.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || 'Failed to update code');
-        return;
-      }
-      setCustomers((prev) => prev.map((c) => c.id === id ? { ...c, customer_code: data.customer_code } : c));
-      setEditingId(null);
-    } finally {
-      setSaving(false);
+    const res = await fetch(`/api/customers/${c.id}/code`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ customer_code: result.value }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.error || 'Failed to update', timer: 3000, showConfirmButton: false });
+      return;
     }
+    setCustomers((prev) => prev.map((x) => x.id === c.id ? { ...x, customer_code: data.customer_code } : x));
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `บันทึกรหัส ${data.customer_code} สำเร็จ`, timer: 2000, showConfirmButton: false });
   }
 
   return (
@@ -128,48 +133,17 @@ export default function CustomersPage() {
               {customers.map((c) => (
                 <tr key={c.id} onClick={() => router.push(`/admin/customers/${c.id}`)} style={{ cursor: 'pointer' }}>
                   <td onClick={(e) => e.stopPropagation()}>
-                    {editingId === c.id ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <input
-                          className="input"
-                          style={{ width: 120, padding: '3px 7px', fontSize: 13 }}
-                          value={editingCode}
-                          onChange={(e) => setEditingCode(e.target.value.toUpperCase())}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveCode(e as unknown as React.MouseEvent, c.id);
-                            if (e.key === 'Escape') { setEditingId(null); }
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={(e) => saveCode(e, c.id)}
-                          disabled={saving}
-                          style={{ background: '#0b57b7', color: '#fff', border: 0, borderRadius: 6, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}
-                        >
-                          {saving ? '...' : '✓'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          style={{ background: '#f1f3f7', border: 0, borderRadius: 6, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{c.customer_code}</span>
-                        <button
-                          type="button"
-                          onClick={(e) => startEdit(e, c)}
-                          title="แก้ไขรหัสลูกค้า"
-                          style={{ background: 'transparent', border: '1px solid #dde2ea', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', fontSize: 11, color: '#546e7a', lineHeight: 1 }}
-                        >
-                          ✎
-                        </button>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{c.customer_code}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleEditCode(e, c)}
+                        title="แก้ไขรหัสลูกค้า"
+                        style={{ background: 'transparent', border: '1px solid #dde2ea', borderRadius: 5, padding: '2px 6px', cursor: 'pointer', fontSize: 11, color: '#546e7a', lineHeight: 1 }}
+                      >
+                        ✎
+                      </button>
+                    </div>
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

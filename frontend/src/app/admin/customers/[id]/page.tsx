@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Swal from 'sweetalert2';
 import FlexPreview from './FlexPreview';
 import {
   UserIcon, UserPlusIcon, GlobeIcon, LinkIcon,
@@ -118,9 +119,6 @@ export default function CustomerDetailPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [messages, setMessages] = useState<MessageLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingCode, setEditingCode] = useState(false);
-  const [codeInput, setCodeInput] = useState('');
-  const [savingCode, setSavingCode] = useState(false);
 
   useEffect(() => {
     fetch(`/api/customers/${id}`, { credentials: 'include' })
@@ -135,23 +133,46 @@ export default function CustomerDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  async function handleSaveCode() {
-    if (!customer || !codeInput.trim()) return;
-    setSavingCode(true);
-    try {
-      const res = await fetch(`/api/customers/${customer.id}/code`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ customer_code: codeInput.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to update code'); return; }
-      setCustomer((prev) => prev ? { ...prev, customer_code: data.customer_code } : prev);
-      setEditingCode(false);
-    } finally {
-      setSavingCode(false);
+  async function handleEditCode() {
+    if (!customer) return;
+    const result = await Swal.fire({
+      title: 'แก้ไขรหัสลูกค้า',
+      html: `<div style="font-size:13px;color:#546e7a;margin-bottom:8px">${customer.display_name || '-'}</div>`,
+      input: 'text',
+      inputValue: customer.customer_code,
+      inputLabel: 'รหัสลูกค้า',
+      inputPlaceholder: 'เช่น JWD/000001',
+      showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#0b57b7',
+      cancelButtonColor: '#8a94a4',
+      reverseButtons: true,
+      didOpen: () => {
+        const input = Swal.getInput();
+        if (input) input.addEventListener('input', () => { input.value = input.value.toUpperCase(); });
+      },
+      preConfirm: (value: string) => {
+        if (!value?.trim()) { Swal.showValidationMessage('กรุณาใส่รหัสลูกค้า'); return false; }
+        return value.trim().toUpperCase();
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    const res = await fetch(`/api/customers/${customer.id}/code`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ customer_code: result.value }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.error || 'Failed to update', timer: 3000, showConfirmButton: false });
+      return;
     }
+    setCustomer((prev) => prev ? { ...prev, customer_code: data.customer_code } : prev);
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `บันทึกรหัส ${data.customer_code} สำเร็จ`, timer: 2000, showConfirmButton: false });
   }
 
   if (loading) return <p className="page-subtitle">Loading...</p>;
@@ -191,48 +212,15 @@ export default function CustomerDetailPage() {
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 0', flexWrap: 'wrap' }}>
-            {editingCode ? (
-              <>
-                <input
-                  className="input"
-                  style={{ width: 140, padding: '3px 8px', fontSize: 13 }}
-                  value={codeInput}
-                  onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveCode();
-                    if (e.key === 'Escape') setEditingCode(false);
-                  }}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCode}
-                  disabled={savingCode}
-                  style={{ background: '#0b57b7', color: '#fff', border: 0, borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
-                >
-                  {savingCode ? '...' : 'บันทึก'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingCode(false)}
-                  style={{ background: '#f1f3f7', border: 0, borderRadius: 6, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}
-                >
-                  ยกเลิก
-                </button>
-              </>
-            ) : (
-              <>
-                <span className="page-subtitle" style={{ margin: 0, fontFamily: 'monospace' }}>{customer.customer_code}</span>
-                <button
-                  type="button"
-                  onClick={() => { setCodeInput(customer.customer_code); setEditingCode(true); }}
-                  title="แก้ไขรหัสลูกค้า"
-                  style={{ background: 'transparent', border: '1px solid #dde2ea', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 12, color: '#546e7a' }}
-                >
-                  ✎ แก้ไขรหัส
-                </button>
-              </>
-            )}
+            <span className="page-subtitle" style={{ margin: 0, fontFamily: 'monospace' }}>{customer.customer_code}</span>
+            <button
+              type="button"
+              onClick={handleEditCode}
+              title="แก้ไขรหัสลูกค้า"
+              style={{ background: 'transparent', border: '1px solid #dde2ea', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 12, color: '#546e7a' }}
+            >
+              ✎ แก้ไขรหัส
+            </button>
             <span className="page-subtitle" style={{ margin: 0 }}>· LINE UID: {customer.line_uid || '-'}</span>
           </div>
           <p className="page-subtitle" style={{ margin: '2px 0 0', fontSize: 12 }}>

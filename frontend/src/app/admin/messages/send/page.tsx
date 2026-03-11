@@ -83,6 +83,7 @@ export default function SendMessagePage() {
   const [customerOrders, setCustomerOrders] = useState<OrderOption[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
   const [bodyIntroText, setBodyIntroText] = useState('');
   const [footerNote, setFooterNote] = useState('');
   const [amount, setAmount] = useState('');
@@ -92,9 +93,6 @@ export default function SendMessagePage() {
   const [applyWithholding, setApplyWithholding] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; orderId?: number; orderCode?: string; lineError?: string } | null>(null);
-  const [editingCode, setEditingCode] = useState(false);
-  const [codeInput, setCodeInput] = useState('');
-  const [savingCode, setSavingCode] = useState(false);
 
   useEffect(() => {
     fetch('/api/account-types', { credentials: 'include' })
@@ -247,23 +245,47 @@ export default function SendMessagePage() {
     }),
   );
 
-  async function handleSaveCode() {
-    if (!selectedCustomer || !codeInput.trim()) return;
-    setSavingCode(true);
-    try {
-      const res = await fetch(`/api/customers/${selectedCustomer.id}/code`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ customer_code: codeInput.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { alert(data.error || 'Failed to update code'); return; }
-      setSelectedCustomer((prev) => prev ? { ...prev, customer_code: data.customer_code } : prev);
-      setEditingCode(false);
-    } finally {
-      setSavingCode(false);
+  async function handleEditCode(target?: Customer) {
+    const cust = target ?? selectedCustomer;
+    if (!cust) return;
+    const result = await Swal.fire({
+      title: 'แก้ไขรหัสลูกค้า',
+      html: `<div style="font-size:13px;color:#546e7a;margin-bottom:8px">${cust.display_name || '-'}</div>`,
+      input: 'text',
+      inputValue: cust.customer_code,
+      inputLabel: 'รหัสลูกค้า',
+      inputPlaceholder: 'เช่น JWD/000001',
+      showCancelButton: true,
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#0b57b7',
+      cancelButtonColor: '#8a94a4',
+      reverseButtons: true,
+      didOpen: () => {
+        const input = Swal.getInput();
+        if (input) input.addEventListener('input', () => { input.value = input.value.toUpperCase(); });
+      },
+      preConfirm: (value: string) => {
+        if (!value?.trim()) { Swal.showValidationMessage('กรุณาใส่รหัสลูกค้า'); return false; }
+        return value.trim().toUpperCase();
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    const res = await fetch(`/api/customers/${cust.id}/code`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ customer_code: result.value }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.error || 'Failed to update', timer: 3000, showConfirmButton: false });
+      return;
     }
+    setSelectedCustomer((prev) => prev ? { ...prev, customer_code: data.customer_code } : prev);
+    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `บันทึกรหัส ${data.customer_code} สำเร็จ`, timer: 2000, showConfirmButton: false });
   }
 
   async function handleSend(e: React.FormEvent) {
@@ -356,52 +378,19 @@ export default function SendMessagePage() {
           <form onSubmit={handleSend}>
             <label className="field-label">Customer *</label>
             {selectedCustomer ? (
-              <div style={{ marginBottom: 10 }}>
-                <div className="input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ecf9f2' }}>
-                  <span><strong>{selectedCustomer.customer_code}</strong> - {selectedCustomer.display_name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => { setCodeInput(selectedCustomer.customer_code); setEditingCode(true); }}
-                      title="แก้ไขรหัสลูกค้า"
-                      style={{ background: 'transparent', border: '1px solid #aacfb5', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#2e7d32' }}
-                    >
-                      ✎ แก้ไขรหัส
-                    </button>
-                    <button type="button" onClick={() => { setSelectedCustomer(null); setSearch(''); setEditingCode(false); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 14, color: '#546e7a' }}>✕</button>
-                  </div>
+              <div className="input" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#ecf9f2', marginBottom: 10 }}>
+                <span><strong>{selectedCustomer.customer_code}</strong> - {selectedCustomer.display_name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={handleEditCode}
+                    title="แก้ไขรหัสลูกค้า"
+                    style={{ background: 'transparent', border: '1px solid #aacfb5', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 11, color: '#2e7d32' }}
+                  >
+                    ✎ แก้ไขรหัส
+                  </button>
+                  <button type="button" onClick={() => { setSelectedCustomer(null); setSearch(''); }} style={{ background: 'transparent', border: 0, cursor: 'pointer', fontSize: 14, color: '#546e7a' }}>✕</button>
                 </div>
-                {editingCode && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                    <input
-                      className="input"
-                      style={{ flex: 1, padding: '4px 8px', fontSize: 13 }}
-                      value={codeInput}
-                      onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveCode();
-                        if (e.key === 'Escape') setEditingCode(false);
-                      }}
-                      placeholder="เช่น JWD/000001"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveCode}
-                      disabled={savingCode}
-                      style={{ background: '#0b57b7', color: '#fff', border: 0, borderRadius: 6, padding: '4px 12px', fontSize: 13, cursor: 'pointer' }}
-                    >
-                      {savingCode ? '...' : 'บันทึก'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingCode(false)}
-                      style={{ background: '#f1f3f7', border: 0, borderRadius: 6, padding: '4px 10px', fontSize: 13, cursor: 'pointer' }}
-                    >
-                      ยกเลิก
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               <div style={{ position: 'relative' }}>
@@ -423,7 +412,7 @@ export default function SendMessagePage() {
                         <button
                           type="button"
                           style={{ flex: 1, textAlign: 'left', border: 0, background: '#fff', padding: 10, cursor: 'pointer' }}
-                          onClick={() => { setSelectedCustomer(c); setSuggestions([]); setEditingCode(false); }}
+                          onClick={() => { setSelectedCustomer(c); setSuggestions([]); }}
                         >
                           <strong>{c.customer_code}</strong> - {c.display_name}
                         </button>
@@ -431,7 +420,7 @@ export default function SendMessagePage() {
                           type="button"
                           title="แก้ไขรหัสลูกค้า"
                           style={{ background: 'transparent', border: '1px solid #dde2ea', borderRadius: 5, padding: '3px 8px', margin: '0 8px', cursor: 'pointer', fontSize: 11, color: '#546e7a', whiteSpace: 'nowrap' }}
-                          onClick={() => { setSelectedCustomer(c); setSuggestions([]); setCodeInput(c.customer_code); setEditingCode(true); }}
+                          onClick={() => { setSelectedCustomer(c); setSuggestions([]); handleEditCode(c); }}
                         >
                           ✎ แก้ไขรหัส
                         </button>
@@ -493,17 +482,25 @@ export default function SendMessagePage() {
                 </select>
 
                 {selectedOrder && (
-                  <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: '#f7f8fb', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>{selectedOrder.order_code}</div>
-                    <div style={{ display: 'grid', gap: 6, fontSize: 13, color: '#475569' }}>
-                      <div>Order Ref ID: #{selectedOrder.id}</div>
-                      <div>สถานะ: {statusLabel(selectedOrder.status)}</div>
-                      <div>Stage: {selectedOrder.stage}</div>
-                      <div>ประเภทบัญชี: {selectedOrder.account_type || '-'}</div>
-                      <div>จำนวนเงิน: {money(Number(selectedOrder.amount || 0))}</div>
-                      <div>อัตราแลกเปลี่ยน: {selectedOrder.exchange_rate != null ? `${selectedOrder.exchange_rate} ${selectedOrder.exchange_rate_currency || 'CNY'}` : '-'}</div>
-                      <div>ยอดสุทธิ: {money(Number(selectedOrder.total_amount || 0))}</div>
-                    </div>
+                  <div style={{ marginTop: 8, borderRadius: 10, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowOrderDetail((v) => !v)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f7f8fb', border: 0, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#0f172a' }}
+                    >
+                      <span>{selectedOrder.order_code} <span style={{ fontWeight: 400, color: '#8a94a4', fontSize: 12 }}>#{selectedOrder.id}</span></span>
+                      <span style={{ fontSize: 11, color: '#8a94a4' }}>{showOrderDetail ? '▲ ซ่อน' : '▼ รายละเอียด'}</span>
+                    </button>
+                    {showOrderDetail && (
+                      <div style={{ padding: '10px 12px', display: 'grid', gap: 5, fontSize: 13, color: '#475569' }}>
+                        <div>สถานะ: {statusLabel(selectedOrder.status)}</div>
+                        <div>Stage: {selectedOrder.stage}</div>
+                        <div>ประเภทบัญชี: {selectedOrder.account_type || '-'}</div>
+                        <div>จำนวนเงิน: {money(Number(selectedOrder.amount || 0))}</div>
+                        <div>อัตราแลกเปลี่ยน: {selectedOrder.exchange_rate != null ? `${parseFloat(Number(selectedOrder.exchange_rate).toFixed(2))} ${selectedOrder.exchange_rate_currency || 'CNY'}` : '-'}</div>
+                        <div>ยอดสุทธิ: {money(Number(selectedOrder.total_amount || 0))}</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

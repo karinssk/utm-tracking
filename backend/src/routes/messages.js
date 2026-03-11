@@ -200,7 +200,7 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
   };
 
   const exchangeRateLabel = typeof data.exchangeRate === 'number'
-    ? `${data.exchangeRate} ${(data.exchangeRateCurrency || 'CNY')}`.trim()
+    ? `${parseFloat(data.exchangeRate.toFixed(2))} ${(data.exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
   const introText = interpolateTemplateText(meta.bodyIntroText, {
     customerName: data.customerName,

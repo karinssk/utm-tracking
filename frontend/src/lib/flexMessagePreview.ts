@@ -191,7 +191,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   } = input;
 
   const exchangeRateLabel = typeof exchangeRate === 'number'
-    ? `${exchangeRate} ${(exchangeRateCurrency || 'CNY')}`.trim()
+    ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
   const introText = interpolateTemplateText(bodyIntroText || template.body_intro_text, {
     customerName,
