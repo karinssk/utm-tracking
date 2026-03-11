@@ -11,6 +11,7 @@ const SendSchema = z.object({
   orderId: z.number().int().positive().optional(),
   accountType: z.string().optional(),
   bodyIntroText: z.string().trim().max(2000).optional(),
+  accountNote: z.string().trim().max(1000).optional(),
   footerNote: z.string().trim().max(1000).optional(),
   amount: z.number().positive().optional(),
   exchangeRate: z.number().positive().optional(),
@@ -179,7 +180,7 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
     separatorColor: pickColor(cfg?.separator_color, baseMeta.separatorColor),
     footerSeparatorColor: pickColor(cfg?.footer_separator_color, baseMeta.footerSeparatorColor),
     codePrefix: cfg?.subtitle || baseMeta.codePrefix,
-    footer: data.footerNote || cfg?.footer_note || baseMeta.footer,
+    footer: [data.accountNote, data.footerNote].filter(Boolean).join('\n') || cfg?.footer_note || baseMeta.footer,
     buttonConfirmLabel: cfg?.button_confirm_label || baseMeta.buttonConfirmLabel,
     buttonConfirmColor: pickColor(cfg?.button_confirm_color, baseMeta.buttonConfirmColor),
     buttonCancelLabel: cfg?.button_cancel_label || baseMeta.buttonCancelLabel,
@@ -221,14 +222,30 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
   if (data.applyWithholding) rows.push([meta.detailLabels.withholding, fmt(data.withholdingAmount || 0)]);
   if (typeof data.netTotal === 'number') rows.push([meta.detailLabels.netTotal, fmt(data.netTotal)]);
 
+  const bankNameLabel = meta.detailLabels.accountName;
+  const bankNumberLabel = meta.detailLabels.accountNumber;
+  const bankTypeLabel = meta.detailLabels.accountType;
+
   const contents = rows.flatMap(([label, value], i) => {
+    const isBankInfo = label === bankTypeLabel || label === bankNameLabel || label === bankNumberLabel;
+    const isNameOrNumber = label === bankNameLabel || label === bankNumberLabel;
     const row = {
       type: 'box',
       layout: 'baseline',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: label, color: meta.bodyLabelColor, size: 'sm', flex: 4 },
-        { type: 'text', text: value, wrap: true, color: meta.bodyTextColor, size: 'sm', flex: 6, align: 'end' },
+        { type: 'text', text: label, color: meta.bodyLabelColor, size: 'sm', flex: 4, weight: isBankInfo ? 'bold' : 'regular' },
+        {
+          type: 'text',
+          text: value,
+          wrap: true,
+          color: isNameOrNumber ? meta.accent : meta.bodyTextColor,
+          size: isNameOrNumber ? 'md' : 'sm',
+          flex: 6,
+          align: 'end',
+          weight: isNameOrNumber ? 'bold' : 'regular',
+          decoration: isNameOrNumber ? 'underline' : 'none',
+        },
       ],
     };
     return i === rows.length - 1 ? [row] : [row, { type: 'separator', margin: 'md', color: meta.separatorColor }];
@@ -397,7 +414,7 @@ router.post('/send', requireAuth, async (req, res) => {
 
     const accountMetaResult = data.accountType
       ? await client.query(
-        `SELECT code, label, account_name, account_number
+        `SELECT code, label, account_name, account_number, account_note
          FROM account_types
          WHERE code = $1 AND is_active = TRUE`,
         [data.accountType],

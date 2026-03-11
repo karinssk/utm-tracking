@@ -274,6 +274,10 @@ export async function initDb() {
       ADD COLUMN IF NOT EXISTS account_number TEXT;
     `);
     await client.query(`
+      ALTER TABLE account_types
+      ADD COLUMN IF NOT EXISTS account_note TEXT;
+    `);
+    await client.query(`
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS exchange_rate_currency TEXT;
     `);

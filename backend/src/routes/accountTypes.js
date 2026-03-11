@@ -17,6 +17,7 @@ const CreateSchema = z.object({
   label: z.string().min(1).max(120),
   account_name: z.string().max(200).nullable().optional(),
   account_number: z.string().max(120).nullable().optional(),
+  account_note: z.string().max(500).nullable().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
 });
@@ -25,6 +26,7 @@ const UpdateSchema = z.object({
   label: z.string().min(1).max(120).optional(),
   account_name: z.string().max(200).nullable().optional(),
   account_number: z.string().max(120).nullable().optional(),
+  account_note: z.string().max(500).nullable().optional(),
   is_active: z.boolean().optional(),
   sort_order: z.number().int().optional(),
 });
@@ -32,7 +34,7 @@ const UpdateSchema = z.object({
 router.get('/', requireAuth, async (_req, res) => {
   try {
     const data = await pool.query(
-      `SELECT id, code, label, account_name, account_number, is_active, sort_order, updated_at
+      `SELECT id, code, label, account_name, account_number, account_note, is_active, sort_order, updated_at
        FROM account_types
        ORDER BY sort_order ASC, id ASC`,
     );
@@ -49,17 +51,19 @@ router.post('/', requireAuth, async (req, res) => {
   const data = parsed.data;
   const accountName = normalizeNullableText(data.account_name);
   const accountNumber = normalizeNullableText(data.account_number);
+  const accountNote = normalizeNullableText(data.account_note);
 
   try {
     const result = await pool.query(
-      `INSERT INTO account_types (code, label, account_name, account_number, is_active, sort_order, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW())
-       RETURNING id, code, label, account_name, account_number, is_active, sort_order, updated_at`,
+      `INSERT INTO account_types (code, label, account_name, account_number, account_note, is_active, sort_order, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+       RETURNING id, code, label, account_name, account_number, account_note, is_active, sort_order, updated_at`,
       [
         data.code.toUpperCase(),
         data.label,
         accountName ?? null,
         accountNumber ?? null,
+        accountNote ?? null,
         data.is_active ?? true,
         data.sort_order ?? 0,
       ],
@@ -79,6 +83,7 @@ router.put('/:id', requireAuth, async (req, res) => {
   const data = parsed.data;
   const accountName = normalizeNullableText(data.account_name);
   const accountNumber = normalizeNullableText(data.account_number);
+  const accountNote = normalizeNullableText(data.account_note);
 
   try {
     const before = await pool.query('SELECT * FROM account_types WHERE id = $1', [id]);
@@ -89,15 +94,17 @@ router.put('/:id', requireAuth, async (req, res) => {
        SET label = $1,
            account_name = $2,
            account_number = $3,
-           is_active = $4,
-           sort_order = $5,
+           account_note = $4,
+           is_active = $5,
+           sort_order = $6,
            updated_at = NOW()
-       WHERE id = $6
-       RETURNING id, code, label, account_name, account_number, is_active, sort_order, updated_at`,
+       WHERE id = $7
+       RETURNING id, code, label, account_name, account_number, account_note, is_active, sort_order, updated_at`,
       [
         data.label ?? row.label,
         accountName !== undefined ? accountName : row.account_name,
         accountNumber !== undefined ? accountNumber : row.account_number,
+        accountNote !== undefined ? accountNote : row.account_note,
         data.is_active ?? row.is_active,
         data.sort_order ?? row.sort_order,
         id,

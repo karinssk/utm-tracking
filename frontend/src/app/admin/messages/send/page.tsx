@@ -18,6 +18,7 @@ interface AccountTypeOption {
   label: string;
   account_name: string | null;
   account_number: string | null;
+  account_note: string | null;
   is_active: boolean;
   sort_order: number;
 }
@@ -224,6 +225,7 @@ export default function SendMessagePage() {
       orderId: selectedOrder?.id || 999,
       customerName: selectedCustomer?.display_name || 'P\'rin',
       bodyIntroText,
+      accountNote: selectedAccountMeta?.account_note || undefined,
       footerNote,
       accountType: accountType || undefined,
       amount: toNum(amount),
@@ -309,6 +311,7 @@ export default function SendMessagePage() {
           orderId: selectedOrder ? selectedOrder.id : undefined,
           accountType: accountType || undefined,
           bodyIntroText: bodyIntroText || undefined,
+          accountNote: selectedAccountMeta?.account_note || undefined,
           footerNote: footerNote || undefined,
           amount: amount ? Number(amount) : undefined,
           exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
@@ -455,12 +458,18 @@ export default function SendMessagePage() {
             />
 
             <label className="field-label">Custom Footer</label>
+            {selectedAccountMeta?.account_note && (
+              <div style={{ padding: '6px 10px', background: '#f0f4ff', borderRadius: 8, border: '1px solid #c7d7f5', marginBottom: 6, fontSize: 12, color: '#1a3a6e', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <span style={{ opacity: 0.5, fontSize: 11, whiteSpace: 'nowrap', marginTop: 1 }}>auto ▸</span>
+                <span style={{ whiteSpace: 'pre-line' }}>{selectedAccountMeta.account_note}</span>
+              </div>
+            )}
             <textarea
               className="input"
-              style={{ width: '100%', minHeight: 72, resize: 'vertical' }}
+              style={{ width: '100%', minHeight: 60, resize: 'vertical' }}
               value={footerNote}
               onChange={(e) => setFooterNote(e.target.value)}
-              placeholder={'บัญชีโอนสินค้าออก ในนามบริษัทฯ เท่านั้น\nThank You'}
+              placeholder={'บันทึกเพิ่มเติม / Thank You'}
             />
 
             {needsExistingOrder && (

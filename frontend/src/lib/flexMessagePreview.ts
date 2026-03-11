@@ -133,6 +133,7 @@ interface PreviewInput {
   orderId?: number;
   customerName?: string;
   bodyIntroText?: string;
+  accountNote?: string | null;
   footerNote?: string;
   accountType?: string | null;
   amount?: number;
@@ -174,6 +175,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     orderId,
     customerName,
     bodyIntroText,
+    accountNote,
     footerNote,
     accountType,
     amount,
@@ -196,12 +198,13 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     netTotal,
   });
 
-  const rows = [
+  type RowEntry = [string, string, boolean?]; // [label, value, isBankInfo?]
+  const rows: RowEntry[] = [
     [template.detail_order_code_label, orderCode],
     [template.detail_document_type_label, template.subtitle || template.template_type],
-    [template.detail_account_type_label, accountMeta?.label || accountType || '-'],
-    [template.detail_account_name_label, accountMeta?.account_name || '-'],
-    [template.detail_account_number_label, accountMeta?.account_number || '-'],
+    [template.detail_account_type_label, accountMeta?.label || accountType || '-', true],
+    [template.detail_account_name_label, accountMeta?.account_name || '-', true],
+    [template.detail_account_number_label, accountMeta?.account_number || '-', true],
     [template.detail_amount_label, fmt(amount)],
     [template.detail_exchange_rate_label, exchangeRateLabel],
     [template.detail_total_label, fmt(totalAmount)],
@@ -211,24 +214,45 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   if (applyWithholding) rows.push([template.detail_withholding_label, fmt(withholdingAmount || 0)]);
   if (typeof netTotal === 'number') rows.push([template.detail_net_total_label, fmt(netTotal)]);
 
-  const bodyRows = rows.flatMap(([label, value], idx) => {
+  const bodyRows = rows.flatMap(([label, value, isBankInfo], idx) => {
+    const isNameOrNumber = isBankInfo && (label === template.detail_account_name_label || label === template.detail_account_number_label);
     const row = {
       type: 'box',
       layout: 'baseline',
       spacing: 'sm',
       contents: [
-        { type: 'text', text: label, color: pickColor(template.body_label_color, '#6b7280'), size: 'sm', flex: 4 },
-        { type: 'text', text: value, wrap: true, color: pickColor(template.body_text_color, '#111827'), size: 'sm', flex: 6, align: 'end' },
+        {
+          type: 'text',
+          text: label,
+          color: pickColor(template.body_label_color, '#6b7280'),
+          size: isBankInfo ? 'sm' : 'sm',
+          flex: 4,
+          weight: isBankInfo ? 'bold' : 'regular',
+        },
+        {
+          type: 'text',
+          text: value,
+          wrap: true,
+          color: isNameOrNumber ? pickColor(template.accent_color, '#1565c0') : pickColor(template.body_text_color, '#111827'),
+          size: isNameOrNumber ? 'md' : 'sm',
+          flex: 6,
+          align: 'end',
+          weight: isNameOrNumber ? 'bold' : 'regular',
+          decoration: isNameOrNumber ? 'underline' : 'none',
+        },
       ],
     };
     return idx === rows.length - 1 ? [row] : [row, { type: 'separator', margin: 'md', color: pickColor(template.separator_color, '#f3f4f6') }];
   });
 
+  const footerParts = [accountNote, footerNote].filter(Boolean).join('\n');
+  const footerText = footerParts || template.footer_note || 'ตัวอย่างข้อความ footer';
+
   const footerContents: Array<Record<string, unknown>> = [
     { type: 'separator', color: pickColor(template.footer_separator_color, '#e5e7eb') },
     {
       type: 'text',
-      text: footerNote || template.footer_note || 'ตัวอย่างข้อความ footer',
+      text: footerText,
       size: 'xs',
       color: pickColor(template.footer_text_color, '#4b5563'),
       wrap: true,
