@@ -197,8 +197,14 @@ export default function SendMessagePage() {
   const selectedTemplateConfig = templateConfigs.find((item) => item.template_type === templateType) || DEFAULT_TEMPLATE_CONFIGS[templateType];
   const selectedAccountMeta = accountTypes.find((item) => item.code === accountType) || null;
 
+  const defaultBodyIntroText: Record<TemplateType, string> = {
+    CONFIRM: 'รายละเอียดออเดอร์สำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาตรวจสอบข้อมูลให้เรียบร้อย',
+    IMPORT_INVOICE: 'รายละเอียดใบแจ้งหนี้นำเข้าสำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาชำระค่าใช้จ่ายตามบิลนี้',
+    RECEIPT: 'ใบเสร็จรับเงินสำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nขอบคุณที่ใช้บริการ',
+  };
+
   useEffect(() => {
-    setBodyIntroText(selectedTemplateConfig.body_intro_text || '');
+    setBodyIntroText(selectedTemplateConfig.body_intro_text || defaultBodyIntroText[templateType]);
     setFooterNote(selectedTemplateConfig.footer_note || '');
   }, [selectedTemplateConfig.template_type, selectedTemplateConfig.body_intro_text, selectedTemplateConfig.footer_note]);
 
@@ -369,7 +375,6 @@ export default function SendMessagePage() {
               style={{ width: '100%', minHeight: 96, resize: 'vertical' }}
               value={bodyIntroText}
               onChange={(e) => setBodyIntroText(e.target.value)}
-              placeholder={'รายละเอียดออเดอร์สำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาตรวจสอบข้อมูลให้เรียบร้อย'}
             />
 
             <label className="field-label">Custom Footer</label>

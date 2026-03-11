@@ -162,8 +162,8 @@ function interpolateTemplateText(value: string | null | undefined, context: {
 }) {
   if (!value) return '';
   return String(value)
-    .replaceAll('{{customer_name}}', context.customerName || '-')
-    .replaceAll('{{net_total}}', fmt(context.netTotal));
+    .replace(/\{\{\s*customer_name\s*\}\}/gi, context.customerName || '-')
+    .replace(/\{\{\s*net_total\s*\}\}/gi, fmt(context.netTotal));
 }
 
 export function buildPreviewFlexMessage(input: PreviewInput) {

@@ -161,8 +161,8 @@ function pickColor(value, fallback) {
 function interpolateTemplateText(value, context) {
   if (!value) return '';
   return String(value)
-    .replaceAll('{{customer_name}}', context.customerName || '-')
-    .replaceAll('{{net_total}}', fmt(context.netTotal));
+    .replace(/\{\{\s*customer_name\s*\}\}/gi, context.customerName || '-')
+    .replace(/\{\{\s*net_total\s*\}\}/gi, fmt(context.netTotal));
 }
 
 function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
