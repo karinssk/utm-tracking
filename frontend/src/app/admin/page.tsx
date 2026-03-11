@@ -66,7 +66,7 @@ interface DashboardData {
 
 const TEMPLATE_LABELS: Record<string, string> = {
   IMPORT_INVOICE: 'ใบแจ้งหนี้นำเข้า',
-  CONFIRM: 'ยืนยันคำสั่งซื้อ',
+  CONFIRM: 'คำสั่งซื้อสินค้า',
   RECEIPT: 'ใบเสร็จรับเงิน',
   WELCOME: 'ต้อนรับ',
   INBOUND: 'จากลูกค้า',

@@ -10,6 +10,7 @@ interface Order {
   customer_code: string;
   display_name: string;
   template_type: string;
+  stage: string;
   amount: number;
   total_amount: number;
   status: 'PENDING' | 'CONFIRMED' | 'UNCONFIRMED';
@@ -30,7 +31,7 @@ const STATUS_BADGES: Record<string, string> = {
 };
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  IMPORT_INVOICE: 'ใบแจ้งหนี้นำเข้า',
+  CONFIRM: 'คำสั่งซื้อสินค้า',
 };
 
 export default function OrdersPage() {
@@ -102,7 +103,7 @@ export default function OrdersPage() {
   return (
     <section>
       <h1 className="page-title">คำสั่งซื้อ ({total.toLocaleString()})</h1>
-      <p className="page-subtitle">ติดตามคำสั่งซื้อและสถานะการยืนยัน</p>
+      <p className="page-subtitle">ติดตาม purchase order หลักและสถานะ workflow</p>
 
       <div className="filter-row">
         <input
@@ -130,7 +131,7 @@ export default function OrdersPage() {
           <table className="table">
             <thead>
               <tr>
-                {['Order', 'Customer', 'Name', 'Type', 'Amount', 'Total', 'Status', 'Expire At', 'Actions', 'Created'].map((h) => (
+                {['Order', 'Customer', 'Name', 'Type', 'Amount', 'Total', 'Status', 'Stage', 'Expire At', 'Actions', 'Created'].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -147,6 +148,7 @@ export default function OrdersPage() {
                   <td>
                     <span className={`badge ${STATUS_BADGES[o.status]}`}>{STATUS_LABELS[o.status]}</span>
                   </td>
+                  <td>{o.stage}</td>
                   <td>{o.expires_at ? new Date(o.expires_at).toLocaleString('th-TH') : '-'}</td>
                   <td onClick={(e) => e.stopPropagation()}>
                     {o.status === 'PENDING' ? (
@@ -177,7 +179,7 @@ export default function OrdersPage() {
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', color: '#8a94a4' }}>No data</td>
+                  <td colSpan={11} style={{ textAlign: 'center', color: '#8a94a4' }}>No data</td>
                 </tr>
               )}
             </tbody>

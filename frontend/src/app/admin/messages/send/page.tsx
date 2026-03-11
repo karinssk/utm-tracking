@@ -32,14 +32,15 @@ interface OrderOption {
   exchange_rate_currency: 'USD' | 'CNY' | 'THB' | null;
   total_amount: number | null;
   status: 'PENDING' | 'CONFIRMED' | 'UNCONFIRMED';
+  stage: string;
   expires_at: string | null;
   confirmed_at: string | null;
   created_at: string;
 }
 
 const TEMPLATE_TYPES = [
-  { value: 'IMPORT_INVOICE', label: 'ใบแจ้งหนี้นำเข้า (Import Invoice)', accent: '#1565c0', footer: 'กรุณายืนยันภายใน 24 ชั่วโมง' },
-  { value: 'CONFIRM', label: 'ยืนยันคำสั่งซื้อ', accent: '#2e7d32', footer: 'คำสั่งซื้อได้รับการยืนยันเรียบร้อยแล้ว' },
+  { value: 'CONFIRM', label: 'คำสั่งซื้อสินค้า (Purchase Order)', accent: '#2e7d32', footer: 'กรุณาตรวจสอบรายละเอียดและยืนยันคำสั่งซื้อ' },
+  { value: 'IMPORT_INVOICE', label: 'ใบแจ้งหนี้นำเข้า (Import Invoice)', accent: '#1565c0', footer: 'กรุณาชำระค่าใช้จ่ายนำเข้าตามบิลนี้' },
   { value: 'RECEIPT', label: 'ใบเสร็จ', accent: '#6a1b9a', footer: 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว' },
 ] as const;
 
@@ -74,13 +75,15 @@ export default function SendMessagePage() {
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [templateType, setTemplateType] = useState<TemplateType>('IMPORT_INVOICE');
+  const [templateType, setTemplateType] = useState<TemplateType>('CONFIRM');
   const [accountType, setAccountType] = useState('');
   const [accountTypes, setAccountTypes] = useState<AccountTypeOption[]>([]);
   const [templateConfigs, setTemplateConfigs] = useState<TemplatePreviewConfig[]>([]);
   const [customerOrders, setCustomerOrders] = useState<OrderOption[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [bodyIntroText, setBodyIntroText] = useState('');
+  const [footerNote, setFooterNote] = useState('');
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   const [exchangeRateCurrency, setExchangeRateCurrency] = useState<'USD' | 'CNY' | 'THB'>('CNY');
@@ -146,9 +149,9 @@ export default function SendMessagePage() {
       .finally(() => setLoadingOrders(false));
   }, [selectedCustomer]);
 
-  const needsExistingOrder = templateType !== 'IMPORT_INVOICE';
+  const needsExistingOrder = templateType !== 'CONFIRM';
   const eligibleOrders = useMemo(
-    () => customerOrders.filter((order) => order.template_type === 'IMPORT_INVOICE' && order.status === 'CONFIRMED'),
+    () => customerOrders.filter((order) => order.template_type === 'CONFIRM' && order.status === 'CONFIRMED'),
     [customerOrders],
   );
 
@@ -168,6 +171,19 @@ export default function SendMessagePage() {
     [eligibleOrders, selectedOrderId],
   );
 
+  useEffect(() => {
+    if (!selectedOrder) return;
+    if (!accountType && selectedOrder.account_type) {
+      setAccountType(selectedOrder.account_type);
+    }
+    if (!exchangeRate && selectedOrder.exchange_rate != null) {
+      setExchangeRate(String(selectedOrder.exchange_rate));
+    }
+    if (selectedOrder.exchange_rate_currency) {
+      setExchangeRateCurrency(selectedOrder.exchange_rate_currency);
+    }
+  }, [selectedOrder, accountType, exchangeRate]);
+
   const autoBaseAmount = useMemo(() => toNum(amount) * toNum(exchangeRate), [amount, exchangeRate]);
 
   const summary = useMemo(() => {
@@ -178,32 +194,38 @@ export default function SendMessagePage() {
     return { base, vatAmount, withholdingAmount, netTotal };
   }, [autoBaseAmount, applyVat, applyWithholding]);
 
-  const effectiveAccountType = needsExistingOrder ? selectedOrder?.account_type || '' : accountType;
-  const effectiveAmount = needsExistingOrder ? Number(selectedOrder?.amount || 0) : toNum(amount);
-  const effectiveExchangeRate = needsExistingOrder ? Number(selectedOrder?.exchange_rate || 0) : toNum(exchangeRate);
-  const effectiveExchangeRateCurrency = needsExistingOrder ? selectedOrder?.exchange_rate_currency || 'CNY' : exchangeRateCurrency;
-  const effectiveBase = needsExistingOrder ? Number(selectedOrder?.total_amount || 0) : summary.base;
-  const effectiveNetTotal = needsExistingOrder ? Number(selectedOrder?.total_amount || 0) : summary.netTotal;
-
   const selectedTemplateConfig = templateConfigs.find((item) => item.template_type === templateType) || DEFAULT_TEMPLATE_CONFIGS[templateType];
-  const selectedAccountMeta = accountTypes.find((item) => item.code === effectiveAccountType) || null;
-  const previewOrderCode = selectedOrder?.order_code || 'IMP-INV-YYMMDD-001';
+  const selectedAccountMeta = accountTypes.find((item) => item.code === accountType) || null;
+
+  useEffect(() => {
+    setBodyIntroText(selectedTemplateConfig.body_intro_text || '');
+    setFooterNote(selectedTemplateConfig.footer_note || '');
+  }, [selectedTemplateConfig.template_type, selectedTemplateConfig.body_intro_text, selectedTemplateConfig.footer_note]);
+
+  const previewOrderCode = templateType === 'CONFIRM'
+    ? 'PO-YYMMDD-001'
+    : templateType === 'IMPORT_INVOICE'
+      ? 'IMP-INV-YYMMDD-001'
+      : 'RCPT-YYMMDD-001';
   const previewFlexJson = JSON.stringify(
     buildPreviewFlexMessage({
       template: selectedTemplateConfig,
       templateType,
       orderCode: previewOrderCode,
       orderId: selectedOrder?.id || 999,
-      accountType: effectiveAccountType || undefined,
-      amount: effectiveAmount,
-      exchangeRate: effectiveExchangeRate || undefined,
-      exchangeRateCurrency: effectiveExchangeRateCurrency,
-      totalAmount: effectiveBase,
-      applyVat: !needsExistingOrder && applyVat,
-      applyWithholding: !needsExistingOrder && applyWithholding,
-      vatAmount: !needsExistingOrder ? summary.vatAmount : undefined,
-      withholdingAmount: !needsExistingOrder ? summary.withholdingAmount : undefined,
-      netTotal: effectiveNetTotal,
+      customerName: selectedCustomer?.display_name || 'P\'rin',
+      bodyIntroText,
+      footerNote,
+      accountType: accountType || undefined,
+      amount: toNum(amount),
+      exchangeRate: toNum(exchangeRate) || undefined,
+      exchangeRateCurrency,
+      totalAmount: summary.base,
+      applyVat,
+      applyWithholding,
+      vatAmount: summary.vatAmount,
+      withholdingAmount: summary.withholdingAmount,
+      netTotal: summary.netTotal,
       accountMeta: selectedAccountMeta
         ? {
           label: selectedAccountMeta.label,
@@ -231,7 +253,9 @@ export default function SendMessagePage() {
           <div><b>Template:</b> ${templateLabel}</div>
           ${selectedOrder ? `<div><b>Order Ref ID:</b> #${selectedOrder.id}</div>` : ''}
           ${selectedOrder ? `<div><b>อ้างอิง Order:</b> ${selectedOrder.order_code}</div>` : ''}
-          ${effectiveNetTotal ? `<div><b>ยอดสุทธิ:</b> ${money(effectiveNetTotal)}</div>` : ''}
+          ${bodyIntroText ? `<div><b>Custom Body:</b> ${bodyIntroText.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${footerNote ? `<div><b>Custom Footer:</b> ${footerNote.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${summary.netTotal ? `<div><b>ยอดสุทธิ:</b> ${money(summary.netTotal)}</div>` : ''}
         </div>
       `,
       icon: 'question',
@@ -255,16 +279,18 @@ export default function SendMessagePage() {
           customerId: selectedCustomer.id,
           templateType,
           orderId: selectedOrder ? selectedOrder.id : undefined,
-          accountType: needsExistingOrder ? undefined : accountType || undefined,
-          amount: needsExistingOrder ? undefined : (amount ? Number(amount) : undefined),
-          exchangeRate: needsExistingOrder ? undefined : (exchangeRate ? Number(exchangeRate) : undefined),
+          accountType: accountType || undefined,
+          bodyIntroText: bodyIntroText || undefined,
+          footerNote: footerNote || undefined,
+          amount: amount ? Number(amount) : undefined,
+          exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
           exchangeRateCurrency,
-          totalAmount: needsExistingOrder ? undefined : (summary.base || undefined),
-          applyVat: needsExistingOrder ? undefined : applyVat,
-          applyWithholding: needsExistingOrder ? undefined : applyWithholding,
-          vatAmount: needsExistingOrder ? undefined : (summary.vatAmount || undefined),
-          withholdingAmount: needsExistingOrder ? undefined : (summary.withholdingAmount || undefined),
-          netTotal: needsExistingOrder ? undefined : (summary.netTotal || undefined),
+          totalAmount: summary.base || undefined,
+          applyVat,
+          applyWithholding,
+          vatAmount: summary.vatAmount || undefined,
+          withholdingAmount: summary.withholdingAmount || undefined,
+          netTotal: summary.netTotal || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -292,7 +318,7 @@ export default function SendMessagePage() {
   return (
     <section>
       <h1 className="page-title">ส่งข้อความ Flex Message</h1>
-      <p className="page-subtitle">สร้าง Import Invoice ใหม่ หรือส่งเอกสารต่อเนื่องจาก order เดิมที่ยืนยันแล้ว</p>
+      <p className="page-subtitle">เริ่มต้นด้วยคำสั่งซื้อสินค้า แล้วค่อยส่งใบแจ้งหนี้นำเข้าและใบเสร็จตาม order เดิม</p>
 
       <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(320px, 1fr) minmax(300px, 420px)', alignItems: 'start' }}>
         <div className="table-shell" style={{ padding: 18 }}>
@@ -337,7 +363,25 @@ export default function SendMessagePage() {
               ))}
             </select>
 
-            {needsExistingOrder ? (
+            <label className="field-label">Custom Body Text</label>
+            <textarea
+              className="input"
+              style={{ width: '100%', minHeight: 96, resize: 'vertical' }}
+              value={bodyIntroText}
+              onChange={(e) => setBodyIntroText(e.target.value)}
+              placeholder={'รายละเอียดออเดอร์สำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาตรวจสอบข้อมูลให้เรียบร้อย'}
+            />
+
+            <label className="field-label">Custom Footer</label>
+            <textarea
+              className="input"
+              style={{ width: '100%', minHeight: 72, resize: 'vertical' }}
+              value={footerNote}
+              onChange={(e) => setFooterNote(e.target.value)}
+              placeholder={'บัญชีโอนสินค้าออก ในนามบริษัทฯ เท่านั้น\nThank You'}
+            />
+
+            {needsExistingOrder && (
               <>
                 <label className="field-label">Order อ้างอิง *</label>
                 <select
@@ -363,6 +407,7 @@ export default function SendMessagePage() {
                     <div style={{ display: 'grid', gap: 6, fontSize: 13, color: '#475569' }}>
                       <div>Order Ref ID: #{selectedOrder.id}</div>
                       <div>สถานะ: {statusLabel(selectedOrder.status)}</div>
+                      <div>Stage: {selectedOrder.stage}</div>
                       <div>ประเภทบัญชี: {selectedOrder.account_type || '-'}</div>
                       <div>จำนวนเงิน: {money(Number(selectedOrder.amount || 0))}</div>
                       <div>อัตราแลกเปลี่ยน: {selectedOrder.exchange_rate != null ? `${selectedOrder.exchange_rate} ${selectedOrder.exchange_rate_currency || 'CNY'}` : '-'}</div>
@@ -371,62 +416,60 @@ export default function SendMessagePage() {
                   </div>
                 )}
               </>
-            ) : (
-              <>
-                <label className="field-label">Account Type</label>
-                <select
-                  className="select"
-                  style={{ width: '100%' }}
-                  value={accountType}
-                  onChange={(e) => setAccountType(e.target.value)}
-                >
-                  <option value="">-- Select Account Type --</option>
-                  {accountTypes.map((a) => (
-                    <option key={a.id} value={a.code}>
-                      {a.label} ({a.code})
-                    </option>
-                  ))}
-                </select>
-
-                <label className="field-label">Amount</label>
-                <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
-
-                <label className="field-label">Exchange Rate</label>
-                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
-                  <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
-                  <select
-                    className="select"
-                    style={{ width: '100%' }}
-                    value={exchangeRateCurrency}
-                    onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
-                  >
-                    <option value="CNY">CNY</option>
-                    <option value="USD">USD</option>
-                    <option value="THB">THB</option>
-                  </select>
-                </div>
-
-                <label className="field-label">Total (ฐานคำนวณ)</label>
-                <input
-                  className="input"
-                  style={{ width: '100%', background: '#f7f8fb', color: '#344054' }}
-                  type="text"
-                  value={summary.base.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  readOnly
-                />
-
-                <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
-                    <input type="checkbox" checked={applyVat} onChange={(e) => setApplyVat(e.target.checked)} />
-                    Vat 7% (ภาษีมูลค่าเพิ่ม)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
-                    <input type="checkbox" checked={applyWithholding} onChange={(e) => setApplyWithholding(e.target.checked)} />
-                    หัก ณ ที่จ่าย 3%
-                  </label>
-                </div>
-              </>
             )}
+
+            <label className="field-label">Account Type</label>
+            <select
+              className="select"
+              style={{ width: '100%' }}
+              value={accountType}
+              onChange={(e) => setAccountType(e.target.value)}
+            >
+              <option value="">-- Select Account Type --</option>
+              {accountTypes.map((a) => (
+                <option key={a.id} value={a.code}>
+                  {a.label} ({a.code})
+                </option>
+              ))}
+            </select>
+
+            <label className="field-label">Amount</label>
+            <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
+
+            <label className="field-label">Exchange Rate</label>
+            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
+              <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
+              <select
+                className="select"
+                style={{ width: '100%' }}
+                value={exchangeRateCurrency}
+                onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
+              >
+                <option value="CNY">CNY</option>
+                <option value="USD">USD</option>
+                <option value="THB">THB</option>
+              </select>
+            </div>
+
+            <label className="field-label">Total (ฐานคำนวณ)</label>
+            <input
+              className="input"
+              style={{ width: '100%', background: '#f7f8fb', color: '#344054' }}
+              type="text"
+              value={summary.base.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              readOnly
+            />
+
+            <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
+                <input type="checkbox" checked={applyVat} onChange={(e) => setApplyVat(e.target.checked)} />
+                Vat 7% (ภาษีมูลค่าเพิ่ม)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
+                <input type="checkbox" checked={applyWithholding} onChange={(e) => setApplyWithholding(e.target.checked)} />
+                หัก ณ ที่จ่าย 3%
+              </label>
+            </div>
 
             {result && (
               <div className={`badge ${result.ok ? 'badge-success' : 'badge-danger'}`} style={{ marginTop: 14 }}>

@@ -16,6 +16,15 @@ interface Order {
   exchange_rate: number | null;
   total_amount: number | null;
   status: 'PENDING' | 'CONFIRMED' | 'UNCONFIRMED';
+  stage: string;
+  seller_tracking_no: string | null;
+  seller_tracking_added_at: string | null;
+  thai_warehouse_received_at: string | null;
+  delivery_method: 'PICKUP' | 'DELIVERY' | null;
+  delivery_provider: string | null;
+  delivery_tracking_no: string | null;
+  delivery_note: string | null;
+  delivery_updated_at: string | null;
   expires_at: string | null;
   confirmed_at: string | null;
   created_at: string;
@@ -35,6 +44,21 @@ interface MessageLog {
   sent_at: string;
 }
 
+interface RelatedDocument {
+  id: number;
+  order_code: string;
+  template_type: string;
+  account_type: string | null;
+  amount: number | null;
+  exchange_rate: number | null;
+  exchange_rate_currency: string | null;
+  total_amount: number | null;
+  status: string;
+  stage: string;
+  created_at: string;
+  confirmed_at: string | null;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอยืนยัน',
   CONFIRMED: 'ยืนยันแล้ว',
@@ -47,9 +71,22 @@ const STATUS_BADGES: Record<string, string> = {
 };
 const TEMPLATE_LABELS: Record<string, string> = {
   IMPORT_INVOICE: 'ใบแจ้งหนี้นำเข้า',
-  CONFIRM: 'ยืนยันคำสั่งซื้อ',
+  CONFIRM: 'คำสั่งซื้อสินค้า',
   RECEIPT: 'ใบเสร็จรับเงิน',
 };
+const STAGE_LABELS: Record<string, string> = {
+  WAITING_ORDER_CONFIRMATION: 'รอลูกค้ายืนยันคำสั่งซื้อ',
+  ORDER_CONFIRMED: 'ยืนยันคำสั่งซื้อแล้ว',
+  SELLER_SHIPPED: 'ผู้ขายส่งของแล้ว',
+  WAREHOUSE_RECEIVED: 'สินค้าเข้าโกดังไทยแล้ว',
+  IMPORT_INVOICE_SENT: 'ส่งใบแจ้งหนี้นำเข้าแล้ว',
+  IMPORT_PAID: 'ชำระค่า Import แล้ว',
+  READY_FOR_DISPATCH: 'พร้อมจัดส่งหรือรอรับหน้าโกดัง',
+  PICKUP_SCHEDULED: 'นัดรับที่โกดังแล้ว',
+  DISPATCHED: 'ส่งออกจากโกดังแล้ว',
+  COMPLETED: 'งานเสร็จสมบูรณ์',
+};
+const STAGE_OPTIONS = Object.entries(STAGE_LABELS);
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleString('th-TH', {
@@ -72,8 +109,19 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<MessageLog[]>([]);
+  const [documents, setDocuments] = useState<RelatedDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [savingLifecycle, setSavingLifecycle] = useState(false);
+  const [lifecycle, setLifecycle] = useState({
+    stage: 'WAITING_ORDER_CONFIRMATION',
+    sellerTrackingNo: '',
+    thaiWarehouseReceivedAt: '',
+    deliveryMethod: '',
+    deliveryProvider: '',
+    deliveryTrackingNo: '',
+    deliveryNote: '',
+  });
 
   function load() {
     fetch(`/api/orders/${id}`, { credentials: 'include' })
@@ -81,12 +129,26 @@ export default function OrderDetailPage() {
       .then((data) => {
         setOrder(data.order);
         setMessages(data.messages || []);
+        setDocuments(data.documents || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!order) return;
+    setLifecycle({
+      stage: order.stage || 'WAITING_ORDER_CONFIRMATION',
+      sellerTrackingNo: order.seller_tracking_no || '',
+      thaiWarehouseReceivedAt: order.thai_warehouse_received_at ? order.thai_warehouse_received_at.slice(0, 16) : '',
+      deliveryMethod: order.delivery_method || '',
+      deliveryProvider: order.delivery_provider || '',
+      deliveryTrackingNo: order.delivery_tracking_no || '',
+      deliveryNote: order.delivery_note || '',
+    });
+  }, [order]);
 
   async function updateOrder(action: 'confirm' | 'cancel') {
     if (!order) return;
@@ -124,6 +186,28 @@ export default function OrderDetailPage() {
     }
   }
 
+  async function saveLifecycle() {
+    if (!order) return;
+    setSavingLifecycle(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/lifecycle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(lifecycle),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        Swal.fire({ icon: 'error', title: 'อัปเดตไม่สำเร็จ', text: data.error || 'Update failed' });
+        return;
+      }
+      await Swal.fire({ icon: 'success', title: 'บันทึก workflow แล้ว', timer: 1500, showConfirmButton: false });
+      load();
+    } finally {
+      setSavingLifecycle(false);
+    }
+  }
+
   if (loading) return <p className="page-subtitle">Loading...</p>;
   if (!order) return <p className="page-subtitle">ไม่พบข้อมูลคำสั่งซื้อ</p>;
 
@@ -155,9 +239,15 @@ export default function OrderDetailPage() {
             </div>
 
             <Row label="ประเภทบัญชี" value={order.account_type} />
+            <Row label="Workflow" value={STAGE_LABELS[order.stage] ?? order.stage} />
             <Row label="จำนวนเงิน" value={n(order.amount)} />
             <Row label="อัตราแลกเปลี่ยน" value={order.exchange_rate != null ? String(order.exchange_rate) : null} />
             <Row label="ยอดสุทธิ" value={n(order.total_amount)} />
+            <Row label="เลขพัสดุผู้ขาย" value={order.seller_tracking_no} />
+            <Row label="เข้าโกดังไทย" value={order.thai_warehouse_received_at ? fmt(order.thai_warehouse_received_at) : null} />
+            <Row label="วิธีรับสินค้า" value={order.delivery_method === 'PICKUP' ? 'ลูกค้ารับหน้าโกดัง' : order.delivery_method === 'DELIVERY' ? 'จัดส่งปลายทาง' : null} />
+            <Row label="ผู้ให้บริการขนส่ง" value={order.delivery_provider} />
+            <Row label="เลขติดตามขนส่งไทย" value={order.delivery_tracking_no} />
             <Row label="สร้างเมื่อ" value={fmt(order.created_at)} />
             <Row label="หมดอายุ" value={order.expires_at ? fmt(order.expires_at) : null} />
             {order.confirmed_at && <Row label="ยืนยันเมื่อ" value={fmt(order.confirmed_at)} />}
@@ -184,6 +274,94 @@ export default function OrderDetailPage() {
                 </button>
               </div>
             )}
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#2b3550', marginBottom: 14 }}>Workflow / Logistics</h2>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <label>
+                <p className="field-label">สถานะงาน</p>
+                <select
+                  className="select"
+                  style={{ width: '100%' }}
+                  value={lifecycle.stage}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, stage: e.target.value }))}
+                >
+                  {STAGE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                <p className="field-label">เลขพัสดุจากผู้ขาย</p>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  value={lifecycle.sellerTrackingNo}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, sellerTrackingNo: e.target.value }))}
+                />
+              </label>
+
+              <label>
+                <p className="field-label">วันที่เข้าโกดังไทย</p>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  type="datetime-local"
+                  value={lifecycle.thaiWarehouseReceivedAt}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, thaiWarehouseReceivedAt: e.target.value }))}
+                />
+              </label>
+
+              <label>
+                <p className="field-label">วิธีรับสินค้า</p>
+                <select
+                  className="select"
+                  style={{ width: '100%' }}
+                  value={lifecycle.deliveryMethod}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, deliveryMethod: e.target.value }))}
+                >
+                  <option value="">-- ยังไม่ระบุ --</option>
+                  <option value="DELIVERY">จัดส่งปลายทาง</option>
+                  <option value="PICKUP">ลูกค้ารับเองหน้าโกดัง</option>
+                </select>
+              </label>
+
+              <label>
+                <p className="field-label">ผู้ให้บริการขนส่ง</p>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  value={lifecycle.deliveryProvider}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, deliveryProvider: e.target.value }))}
+                />
+              </label>
+
+              <label>
+                <p className="field-label">เลขติดตามขนส่งไทย</p>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  value={lifecycle.deliveryTrackingNo}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, deliveryTrackingNo: e.target.value }))}
+                />
+              </label>
+
+              <label>
+                <p className="field-label">หมายเหตุ</p>
+                <textarea
+                  className="input"
+                  style={{ width: '100%', minHeight: 88, resize: 'vertical' }}
+                  value={lifecycle.deliveryNote}
+                  onChange={(e) => setLifecycle((prev) => ({ ...prev, deliveryNote: e.target.value }))}
+                />
+              </label>
+
+              <button type="button" className="btn btn-primary" disabled={savingLifecycle} onClick={saveLifecycle}>
+                {savingLifecycle ? 'Saving...' : 'บันทึก Workflow'}
+              </button>
+            </div>
           </div>
 
           {/* Customer card */}
@@ -213,6 +391,33 @@ export default function OrderDetailPage() {
                 ดูข้อมูลลูกค้าทั้งหมด →
               </Link>
             </div>
+          </div>
+
+          <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#2b3550', marginBottom: 14 }}>เอกสารที่อ้างอิง order นี้</h2>
+            {documents.length === 0 ? (
+              <p className="page-subtitle">ยังไม่มีใบแจ้งหนี้นำเข้าหรือใบเสร็จ</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {documents.map((doc) => (
+                  <div key={doc.id} style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#fbfdff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{doc.order_code}</div>
+                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{TEMPLATE_LABELS[doc.template_type] ?? doc.template_type}</div>
+                      </div>
+                      <span className="badge badge-success">{doc.status}</span>
+                    </div>
+                    <div style={{ marginTop: 10, display: 'grid', gap: 6, fontSize: 13, color: '#475569' }}>
+                      <div>จำนวนเงิน: {n(doc.amount)}</div>
+                      <div>อัตราแลกเปลี่ยน: {doc.exchange_rate != null ? `${doc.exchange_rate} ${doc.exchange_rate_currency || 'CNY'}` : '-'}</div>
+                      <div>ยอดสุทธิ: {n(doc.total_amount)}</div>
+                      <div>ส่งเมื่อ: {fmt(doc.created_at)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

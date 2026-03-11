@@ -83,7 +83,7 @@ function statusBadge(status: string) {
 function templateLabel(t: string) {
   const map: Record<string, string> = {
     IMPORT_INVOICE: 'ใบแจ้งหนี้นำเข้า',
-    CONFIRM: 'ยืนยันคำสั่งซื้อ',
+    CONFIRM: 'คำสั่งซื้อสินค้า',
     RECEIPT: 'ใบเสร็จรับเงิน',
     WELCOME: 'ข้อความต้อนรับ',
     INBOUND: 'ข้อความจากลูกค้า',

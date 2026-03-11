@@ -64,6 +64,7 @@ export async function initDb() {
         id            SERIAL PRIMARY KEY,
         order_code    TEXT NOT NULL UNIQUE,
         customer_id   INTEGER NOT NULL REFERENCES customers(id),
+        parent_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
         template_type TEXT NOT NULL,
         account_type  TEXT,
         amount        NUMERIC(18,2),
@@ -71,7 +72,28 @@ export async function initDb() {
         exchange_rate_currency TEXT,
         total_amount  NUMERIC(18,2),
         status        TEXT NOT NULL DEFAULT 'PENDING'
-                        CHECK (status IN ('PENDING','CONFIRMED','UNCONFIRMED')),
+                        CHECK (status IN ('PENDING','CONFIRMED','UNCONFIRMED','SENT')),
+        stage         TEXT NOT NULL DEFAULT 'WAITING_ORDER_CONFIRMATION'
+                        CHECK (stage IN (
+                          'WAITING_ORDER_CONFIRMATION',
+                          'ORDER_CONFIRMED',
+                          'SELLER_SHIPPED',
+                          'WAREHOUSE_RECEIVED',
+                          'IMPORT_INVOICE_SENT',
+                          'IMPORT_PAID',
+                          'READY_FOR_DISPATCH',
+                          'PICKUP_SCHEDULED',
+                          'DISPATCHED',
+                          'COMPLETED'
+                        )),
+        seller_tracking_no TEXT,
+        seller_tracking_added_at TIMESTAMPTZ,
+        thai_warehouse_received_at TIMESTAMPTZ,
+        delivery_method TEXT CHECK (delivery_method IN ('PICKUP','DELIVERY')),
+        delivery_provider TEXT,
+        delivery_tracking_no TEXT,
+        delivery_note TEXT,
+        delivery_updated_at TIMESTAMPTZ,
         expires_at    TIMESTAMPTZ,
         confirmed_at  TIMESTAMPTZ,
         created_at    TIMESTAMPTZ DEFAULT NOW()
@@ -111,6 +133,8 @@ export async function initDb() {
         header_text_color TEXT NOT NULL DEFAULT '#ffffff',
         body_label_color TEXT NOT NULL DEFAULT '#6b7280',
         body_text_color TEXT NOT NULL DEFAULT '#111827',
+        body_intro_text TEXT,
+        body_intro_color TEXT NOT NULL DEFAULT '#0b57b7',
         footer_text_color TEXT NOT NULL DEFAULT '#4b5563',
         separator_color TEXT NOT NULL DEFAULT '#f3f4f6',
         footer_separator_color TEXT NOT NULL DEFAULT '#e5e7eb',
@@ -157,6 +181,14 @@ export async function initDb() {
     await client.query(`
       ALTER TABLE template_configs
       ADD COLUMN IF NOT EXISTS body_text_color TEXT NOT NULL DEFAULT '#111827';
+    `);
+    await client.query(`
+      ALTER TABLE template_configs
+      ADD COLUMN IF NOT EXISTS body_intro_text TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE template_configs
+      ADD COLUMN IF NOT EXISTS body_intro_color TEXT NOT NULL DEFAULT '#0b57b7';
     `);
     await client.query(`
       ALTER TABLE template_configs
@@ -245,6 +277,92 @@ export async function initDb() {
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS exchange_rate_currency TEXT;
     `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS parent_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS stage TEXT NOT NULL DEFAULT 'WAITING_ORDER_CONFIRMATION';
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS seller_tracking_no TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS seller_tracking_added_at TIMESTAMPTZ;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS thai_warehouse_received_at TIMESTAMPTZ;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS delivery_method TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS delivery_provider TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS delivery_tracking_no TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS delivery_note TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS delivery_updated_at TIMESTAMPTZ;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      DROP CONSTRAINT IF EXISTS orders_status_check;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD CONSTRAINT orders_status_check
+      CHECK (status IN ('PENDING','CONFIRMED','UNCONFIRMED','SENT'));
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      DROP CONSTRAINT IF EXISTS orders_stage_check;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD CONSTRAINT orders_stage_check
+      CHECK (stage IN (
+        'WAITING_ORDER_CONFIRMATION',
+        'ORDER_CONFIRMED',
+        'SELLER_SHIPPED',
+        'WAREHOUSE_RECEIVED',
+        'IMPORT_INVOICE_SENT',
+        'IMPORT_PAID',
+        'READY_FOR_DISPATCH',
+        'PICKUP_SCHEDULED',
+        'DISPATCHED',
+        'COMPLETED'
+      ));
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      DROP CONSTRAINT IF EXISTS orders_delivery_method_check;
+    `);
+    await client.query(`
+      ALTER TABLE orders
+      ADD CONSTRAINT orders_delivery_method_check
+      CHECK (delivery_method IN ('PICKUP','DELIVERY') OR delivery_method IS NULL);
+    `);
+    await client.query(`
+      UPDATE orders
+      SET stage = CASE
+        WHEN status = 'CONFIRMED' THEN 'ORDER_CONFIRMED'
+        ELSE 'WAITING_ORDER_CONFIRMATION'
+      END
+      WHERE stage IS NULL;
+    `);
 
     await client.query(`
       ALTER TABLE admin_users
@@ -270,8 +388,8 @@ export async function initDb() {
     await client.query(`
       INSERT INTO template_configs (template_type, display_name, accent_color, subtitle, footer_note, is_active)
       VALUES
-        ('IMPORT_INVOICE', 'ใบแจ้งหนี้นำเข้า', '#1565c0', 'IMPORT INVOICE', 'กรุณายืนยันภายใน 24 ชั่วโมง', TRUE),
-        ('CONFIRM', 'ยืนยันคำสั่งซื้อ', '#2e7d32', 'ORDER CONFIRMATION', 'คำสั่งซื้อได้รับการยืนยันเรียบร้อยแล้ว', TRUE),
+        ('IMPORT_INVOICE', 'ใบแจ้งหนี้นำเข้า', '#1565c0', 'IMPORT INVOICE', 'กรุณาชำระค่าใช้จ่ายนำเข้าตามบิลนี้', TRUE),
+        ('CONFIRM', 'คำสั่งซื้อสินค้า', '#2e7d32', 'PURCHASE ORDER', 'กรุณาตรวจสอบรายละเอียดและยืนยันคำสั่งซื้อ', TRUE),
         ('RECEIPT', 'ใบเสร็จรับเงิน', '#6a1b9a', 'RECEIPT', 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว', TRUE)
       ON CONFLICT (template_type) DO NOTHING;
     `);

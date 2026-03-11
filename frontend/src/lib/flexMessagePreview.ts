@@ -7,6 +7,8 @@ export interface TemplatePreviewConfig {
   header_text_color: string;
   body_label_color: string;
   body_text_color: string;
+  body_intro_text: string | null;
+  body_intro_color: string;
   footer_text_color: string;
   separator_color: string;
   footer_separator_color: string;
@@ -36,11 +38,13 @@ export const DEFAULT_TEMPLATE_CONFIGS: Record<TemplateType, TemplatePreviewConfi
     header_text_color: '#ffffff',
     body_label_color: '#6b7280',
     body_text_color: '#111827',
+    body_intro_text: null,
+    body_intro_color: '#0b57b7',
     footer_text_color: '#4b5563',
     separator_color: '#f3f4f6',
     footer_separator_color: '#e5e7eb',
     subtitle: 'IMPORT INVOICE',
-    footer_note: 'กรุณายืนยันภายใน 24 ชั่วโมง',
+    footer_note: 'กรุณาชำระค่าใช้จ่ายนำเข้าตามบิลนี้',
     button_confirm_label: 'ยืนยัน',
     button_confirm_color: '#16a34a',
     button_cancel_label: 'ยกเลิก',
@@ -58,16 +62,18 @@ export const DEFAULT_TEMPLATE_CONFIGS: Record<TemplateType, TemplatePreviewConfi
   },
   CONFIRM: {
     template_type: 'CONFIRM',
-    display_name: 'ยืนยันคำสั่งซื้อ',
+    display_name: 'คำสั่งซื้อสินค้า',
     accent_color: '#2e7d32',
     header_text_color: '#ffffff',
     body_label_color: '#6b7280',
     body_text_color: '#111827',
+    body_intro_text: null,
+    body_intro_color: '#0b57b7',
     footer_text_color: '#4b5563',
     separator_color: '#f3f4f6',
     footer_separator_color: '#e5e7eb',
-    subtitle: 'ORDER CONFIRMATION',
-    footer_note: 'คำสั่งซื้อได้รับการยืนยันเรียบร้อยแล้ว',
+    subtitle: 'PURCHASE ORDER',
+    footer_note: 'กรุณาตรวจสอบรายละเอียดและยืนยันคำสั่งซื้อ',
     button_confirm_label: 'ยืนยัน',
     button_confirm_color: '#16a34a',
     button_cancel_label: 'ยกเลิก',
@@ -90,6 +96,8 @@ export const DEFAULT_TEMPLATE_CONFIGS: Record<TemplateType, TemplatePreviewConfi
     header_text_color: '#ffffff',
     body_label_color: '#6b7280',
     body_text_color: '#111827',
+    body_intro_text: null,
+    body_intro_color: '#0b57b7',
     footer_text_color: '#4b5563',
     separator_color: '#f3f4f6',
     footer_separator_color: '#e5e7eb',
@@ -123,6 +131,9 @@ interface PreviewInput {
   templateType: TemplateType;
   orderCode: string;
   orderId?: number;
+  customerName?: string;
+  bodyIntroText?: string;
+  footerNote?: string;
   accountType?: string | null;
   amount?: number;
   exchangeRate?: number;
@@ -145,12 +156,25 @@ function pickColor(value: string | null | undefined, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value || '') ? String(value) : fallback;
 }
 
+function interpolateTemplateText(value: string | null | undefined, context: {
+  customerName?: string;
+  netTotal?: number;
+}) {
+  if (!value) return '';
+  return String(value)
+    .replaceAll('{{customer_name}}', context.customerName || '-')
+    .replaceAll('{{net_total}}', fmt(context.netTotal));
+}
+
 export function buildPreviewFlexMessage(input: PreviewInput) {
   const {
     template,
     templateType,
     orderCode,
     orderId,
+    customerName,
+    bodyIntroText,
+    footerNote,
     accountType,
     amount,
     exchangeRate,
@@ -167,6 +191,10 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   const exchangeRateLabel = typeof exchangeRate === 'number'
     ? `${exchangeRate} ${(exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
+  const introText = interpolateTemplateText(bodyIntroText || template.body_intro_text, {
+    customerName,
+    netTotal,
+  });
 
   const rows = [
     [template.detail_order_code_label, orderCode],
@@ -200,14 +228,14 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     { type: 'separator', color: pickColor(template.footer_separator_color, '#e5e7eb') },
     {
       type: 'text',
-      text: template.footer_note || 'ตัวอย่างข้อความ footer',
+      text: footerNote || template.footer_note || 'ตัวอย่างข้อความ footer',
       size: 'xs',
       color: pickColor(template.footer_text_color, '#4b5563'),
       wrap: true,
     },
   ];
 
-  if (templateType === 'IMPORT_INVOICE') {
+  if (templateType === 'CONFIRM') {
     footerContents.push({
       type: 'box',
       layout: 'horizontal',
@@ -267,7 +295,26 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
             layout: 'vertical',
             spacing: 'md',
             paddingAll: '12px',
-            contents: bodyRows,
+            contents: [
+              ...(introText
+                ? [{
+                  type: 'text',
+                  text: introText,
+                  wrap: true,
+                  color: pickColor(template.body_intro_color, '#0b57b7'),
+                  size: 'md',
+                  weight: 'bold',
+                }]
+                : []),
+              ...(introText
+                ? [{
+                  type: 'separator',
+                  margin: 'md',
+                  color: pickColor(template.separator_color, '#f3f4f6'),
+                }]
+                : []),
+              ...bodyRows,
+            ],
           },
         ],
       },

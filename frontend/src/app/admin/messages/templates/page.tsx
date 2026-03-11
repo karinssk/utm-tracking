@@ -10,7 +10,7 @@ type TemplateConfig = TemplatePreviewConfig & {
   updated_at: string;
 };
 
-const ORDER: TemplateType[] = ['IMPORT_INVOICE', 'CONFIRM', 'RECEIPT'];
+const ORDER: TemplateType[] = ['CONFIRM', 'IMPORT_INVOICE', 'RECEIPT'];
 
 function safeColor(value: string, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
@@ -20,7 +20,7 @@ export default function TemplateConfigPage() {
   const [templates, setTemplates] = useState<TemplateConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingType, setSavingType] = useState<TemplateType | null>(null);
-  const [activeTab, setActiveTab] = useState<TemplateType>('IMPORT_INVOICE');
+  const [activeTab, setActiveTab] = useState<TemplateType>('CONFIRM');
 
   useEffect(() => {
     fetch('/api/templates', { credentials: 'include' })
@@ -141,6 +141,16 @@ export default function TemplateConfigPage() {
                     value={current.body_text_color}
                     onChange={(value) => updateTemplate(current.template_type, { body_text_color: value })}
                   />
+                  <TextAreaField
+                    label="Body Intro Text"
+                    value={current.body_intro_text || ''}
+                    onChange={(value) => updateTemplate(current.template_type, { body_intro_text: value })}
+                  />
+                  <ColorField
+                    label="Body Intro Color"
+                    value={current.body_intro_color}
+                    onChange={(value) => updateTemplate(current.template_type, { body_intro_color: value })}
+                  />
                   <ColorField
                     label="Separator Color"
                     value={current.separator_color}
@@ -180,7 +190,7 @@ export default function TemplateConfigPage() {
                   <TextField label="Net Total Label" value={current.detail_net_total_label} onChange={(value) => updateTemplate(current.template_type, { detail_net_total_label: value })} />
                 </FieldGroup>
 
-                {current.template_type === 'IMPORT_INVOICE' && (
+                {current.template_type === 'CONFIRM' && (
                   <FieldGroup title="Buttons">
                     <TextField
                       label="Confirm Button Label"
@@ -276,6 +286,7 @@ function TemplateFlexPreview({ template }: { template: TemplateConfig }) {
       templateType: template.template_type,
       orderCode: 'IMP-INV-250304-001',
       orderId: 101,
+      customerName: 'P\'rin',
       accountType: 'KBANK',
       amount: 10000,
       exchangeRate: 4.75,

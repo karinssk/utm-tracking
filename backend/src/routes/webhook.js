@@ -209,6 +209,7 @@ router.post('/', async (req, res) => {
             const update = await pool.query(
               `UPDATE orders o
                SET status = $1,
+                   stage = CASE WHEN $1 = 'CONFIRMED' THEN 'ORDER_CONFIRMED' ELSE o.stage END,
                    confirmed_at = CASE WHEN $1 = 'CONFIRMED' THEN NOW() ELSE NULL END
                FROM customers c
                WHERE o.customer_id = c.id
@@ -222,8 +223,8 @@ router.post('/', async (req, res) => {
             if (update.rowCount > 0) {
               const order = update.rows[0];
               const ackText = action === 'CONFIRMED'
-                ? `ยืนยันคำสั่งซื้อเรียบร้อยแล้ว\nเลขที่: ${order.order_code}`
-                : `ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว\nเลขที่: ${order.order_code}`;
+                ? `ยืนยันคำสั่งซื้อเรียบร้อยแล้ว\nเลขที่เอกสาร: ${order.order_code}`
+                : `ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว\nเลขที่เอกสาร: ${order.order_code}`;
               await sendLineMessage(lineUid, [{ type: 'text', text: ackText }]);
               await pool.query(
                 `INSERT INTO message_logs (customer_id, order_id, template_type, message_text, line_error)

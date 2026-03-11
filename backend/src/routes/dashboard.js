@@ -11,10 +11,10 @@ router.get('/stats', requireAuth, async (_req, res) => {
         SELECT
           (SELECT COUNT(*) FROM customers)                                                   AS total_customers,
           (SELECT COUNT(*) FROM customers WHERE DATE(created_at) = CURRENT_DATE)            AS new_today,
-          (SELECT COUNT(*) FROM orders WHERE status = 'PENDING')                            AS pending_orders,
-          (SELECT COUNT(*) FROM orders WHERE status = 'CONFIRMED')                          AS confirmed_orders,
-          (SELECT COUNT(*) FROM orders)                                                      AS total_orders,
-          (SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE status = 'CONFIRMED')     AS total_revenue,
+          (SELECT COUNT(*) FROM orders WHERE status = 'PENDING' AND parent_order_id IS NULL) AS pending_orders,
+          (SELECT COUNT(*) FROM orders WHERE status = 'CONFIRMED' AND parent_order_id IS NULL) AS confirmed_orders,
+          (SELECT COUNT(*) FROM orders WHERE parent_order_id IS NULL)                        AS total_orders,
+          (SELECT COALESCE(SUM(total_amount),0) FROM orders WHERE status = 'CONFIRMED' AND parent_order_id IS NULL) AS total_revenue,
           (SELECT COUNT(*) FROM message_logs WHERE DATE(sent_at) = CURRENT_DATE)            AS messages_today,
           (SELECT COUNT(*) FROM message_logs)                                                AS total_messages
       `),
@@ -29,11 +29,11 @@ router.get('/stats', requireAuth, async (_req, res) => {
       `),
 
       pool.query(`
-        SELECT o.id, o.order_code, o.template_type, o.total_amount, o.created_at, o.expires_at,
+        SELECT o.id, o.order_code, o.template_type, o.stage, o.total_amount, o.created_at, o.expires_at,
                c.display_name, c.picture_url, c.customer_code
         FROM orders o
         LEFT JOIN customers c ON c.id = o.customer_id
-        WHERE o.status = 'PENDING'
+        WHERE o.status = 'PENDING' AND o.parent_order_id IS NULL
         ORDER BY o.created_at DESC
         LIMIT 8
       `),
