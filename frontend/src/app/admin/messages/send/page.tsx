@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Swal from 'sweetalert2';
 import FlexPreview from '../../customers/[id]/FlexPreview';
 import type { TemplatePreviewConfig, TemplateType } from '../../../../lib/flexMessagePreview';
@@ -77,6 +77,7 @@ export default function SendMessagePage() {
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [templateType, setTemplateType] = useState<TemplateType>('CONFIRM');
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   const [accountType, setAccountType] = useState('');
   const [accountTypes, setAccountTypes] = useState<AccountTypeOption[]>([]);
   const [templateConfigs, setTemplateConfigs] = useState<TemplatePreviewConfig[]>([]);
@@ -94,6 +95,7 @@ export default function SendMessagePage() {
   const [applyWithholding, setApplyWithholding] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; orderId?: number; orderCode?: string; lineError?: string } | null>(null);
+  const templateDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch('/api/account-types', { credentials: 'include' })
@@ -201,6 +203,7 @@ export default function SendMessagePage() {
   }, [autoBaseAmount, applyVat, applyWithholding]);
 
   const selectedTemplateConfig = templateConfigs.find((item) => item.template_type === templateType) || DEFAULT_TEMPLATE_CONFIGS[templateType];
+  const selectedTemplateOption = TEMPLATE_TYPES.find((item) => item.value === templateType) || TEMPLATE_TYPES[0];
   const selectedAccountMeta = accountTypes.find((item) => item.code === accountType) || null;
 
   const defaultBodyIntroText: Record<TemplateType, string> = {
@@ -213,6 +216,23 @@ export default function SendMessagePage() {
     setBodyIntroText(selectedTemplateConfig.body_intro_text || defaultBodyIntroText[templateType]);
     setFooterNote(selectedTemplateConfig.footer_note || '');
   }, [selectedTemplateConfig.template_type, selectedTemplateConfig.body_intro_text, selectedTemplateConfig.footer_note]);
+
+  useEffect(() => {
+    function closeWhenClickOutside(event: MouseEvent) {
+      const node = templateDropdownRef.current;
+      if (!node) return;
+      if (!node.contains(event.target as Node)) setTemplateDropdownOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setTemplateDropdownOpen(false);
+    }
+    document.addEventListener('mousedown', closeWhenClickOutside);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeWhenClickOutside);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
 
   const previewOrderCode = templateType === 'CONFIRM'
     ? 'PO-YYMMDD-001'
@@ -439,11 +459,104 @@ export default function SendMessagePage() {
             )}
 
             <label className="field-label">Template *</label>
-            <select className="select" style={{ width: '100%' }} value={templateType} onChange={(e) => setTemplateType(e.target.value as TemplateType)}>
-              {TEMPLATE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+            <div
+              ref={templateDropdownRef}
+              style={{
+                position: 'relative',
+                borderRadius: 14,
+                padding: 4,
+                border: '1px solid #dbe6f8',
+                background: 'linear-gradient(180deg, #f6faff 0%, #fff9ef 100%)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setTemplateDropdownOpen((v) => !v)}
+                aria-haspopup="listbox"
+                aria-expanded={templateDropdownOpen}
+                style={{
+                  width: '100%',
+                  minHeight: 50,
+                  borderRadius: 12,
+                  border: templateDropdownOpen ? '2px solid #0b57b7' : '2px solid #f3b261',
+                  background: templateDropdownOpen
+                    ? 'linear-gradient(180deg, #eef5ff 0%, #f9fbff 100%)'
+                    : 'linear-gradient(180deg, #fff8ee 0%, #ffffff 100%)',
+                  color: '#1f2a44',
+                  cursor: 'pointer',
+                  padding: '9px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxShadow: templateDropdownOpen ? '0 0 0 3px rgba(11, 87, 183, 0.16)' : '0 4px 10px rgba(24, 33, 52, 0.06)',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: selectedTemplateOption.accent, flexShrink: 0 }} />
+                  <span style={{ textAlign: 'left', fontWeight: 800, fontSize: 17, lineHeight: 1.2 }}>{selectedTemplateOption.label}</span>
+                </span>
+                <span style={{ fontSize: 14, color: '#0b57b7', fontWeight: 800 }}>{templateDropdownOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {templateDropdownOpen && (
+                <div
+                  role="listbox"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    left: 0,
+                    right: 0,
+                    border: '1px solid #d7e0ee',
+                    borderRadius: 12,
+                    background: 'linear-gradient(180deg, #ffffff 0%, #f7faff 100%)',
+                    padding: 6,
+                    display: 'grid',
+                    gap: 4,
+                    zIndex: 30,
+                    boxShadow: '0 12px 28px rgba(19, 31, 53, 0.14)',
+                  }}
+                >
+                  {TEMPLATE_TYPES.map((t) => {
+                    const active = t.value === templateType;
+                    return (
+                      <button
+                        key={t.value}
+                        type="button"
+                        role="option"
+                        aria-selected={active}
+                        onClick={() => {
+                          setTemplateType(t.value);
+                          setTemplateDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          border: active ? `1px solid ${t.accent}` : '1px solid #edf1f7',
+                          background: active
+                            ? `linear-gradient(180deg, ${t.accent}24 0%, ${t.accent}16 100%)`
+                            : 'linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)',
+                          borderRadius: 9,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          padding: '9px 10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          color: '#21304d',
+                          fontWeight: active ? 800 : 600,
+                          fontSize: 14,
+                        }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 999, background: t.accent, flexShrink: 0 }} />
+                          <span>{t.label}</span>
+                        </span>
+                        {active && <span style={{ fontSize: 12, color: t.accent, fontWeight: 800 }}>Selected</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             <label className="field-label">Custom Body Text</label>
             <textarea

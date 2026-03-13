@@ -215,6 +215,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   const exchangeRateLabel = typeof exchangeRate === 'number'
     ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
+  const isImportInvoice = templateType === 'IMPORT_INVOICE';
   const introText = interpolateTemplateText(bodyIntroText || template.body_intro_text, {
     customerCode,
     customerName,
@@ -228,10 +229,12 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     [template.detail_account_type_label, accountMeta?.label || accountType || '-', true],
     [template.detail_account_name_label, accountMeta?.account_name || '-', true],
     [template.detail_account_number_label, accountMeta?.account_number || '-', true],
-    [template.detail_amount_label, fmtYuan(amount)],
-    [template.detail_exchange_rate_label, exchangeRateLabel],
-    [template.detail_total_label, fmtBaht(totalAmount)],
+    [template.detail_amount_label, isImportInvoice ? fmtBaht(amount) : fmtYuan(amount)],
   ];
+  if (!isImportInvoice) {
+    rows.push([template.detail_exchange_rate_label, exchangeRateLabel]);
+    rows.push([template.detail_total_label, fmtBaht(totalAmount)]);
+  }
 
   if (applyVat) rows.push([template.detail_vat_label, fmtBaht(vatAmount || 0)]);
   if (applyWithholding) rows.push([template.detail_withholding_label, fmtBaht(withholdingAmount || 0)]);
@@ -239,6 +242,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
 
   const bodyRows = rows.flatMap(([label, value, isBankInfo], idx) => {
     const isNameOrNumber = isBankInfo && (label === template.detail_account_name_label || label === template.detail_account_number_label);
+    const isNetTotal = label === template.detail_net_total_label;
     const row = {
       type: 'box',
       layout: 'baseline',
@@ -248,19 +252,19 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
           type: 'text',
           text: label,
           color: pickColor(template.body_label_color, '#6b7280'),
-          size: isBankInfo ? 'sm' : 'sm',
+          size: isNetTotal ? 'md' : 'sm',
           flex: 4,
-          weight: isBankInfo ? 'bold' : 'regular',
+          weight: isBankInfo || isNetTotal ? 'bold' : 'regular',
         },
         {
           type: 'text',
           text: value,
           wrap: true,
           color: isNameOrNumber ? pickColor(template.accent_color, '#1565c0') : pickColor(template.body_text_color, '#111827'),
-          size: isNameOrNumber ? 'md' : 'sm',
+          size: isNameOrNumber ? 'md' : (isNetTotal ? 'lg' : 'sm'),
           flex: 6,
           align: 'end',
-          weight: isNameOrNumber ? 'bold' : 'regular',
+          weight: isNameOrNumber || isNetTotal ? 'bold' : 'regular',
           decoration: isNameOrNumber ? 'underline' : 'none',
         },
       ],
