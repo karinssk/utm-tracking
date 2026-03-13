@@ -251,6 +251,45 @@ type EditForm = {
 
 const MAX_DATA_URL_BYTES = 850 * 1024;
 const MAX_IMAGE_DIMENSION = 1920;
+const BLOCK_TYPE_SET = new Set([
+  'image',
+  'add_friend',
+  'hero-full-width',
+  'hero-full-width-btn-left',
+  'add_friend_banner',
+  'add_friend_card',
+  'hero-with-dynamic-add-line',
+]);
+
+function parseErrorMessage(payload: unknown, fallback: string) {
+  if (payload && typeof payload === 'object' && 'error' in payload) {
+    const raw = (payload as { error?: unknown }).error;
+    if (typeof raw === 'string' && raw.trim()) return raw;
+  }
+  return fallback;
+}
+
+function normalizeBlock(raw: unknown): Block | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const item = raw as Record<string, unknown>;
+  const id = Number(item.id);
+  const type = String(item.type || '');
+  if (!Number.isInteger(id) || id <= 0) return null;
+  if (!BLOCK_TYPE_SET.has(type)) return null;
+
+  return {
+    id,
+    type: type as Block['type'],
+    image_url: typeof item.image_url === 'string' ? item.image_url : null,
+    label: typeof item.label === 'string' ? item.label : null,
+    button_url: typeof item.button_url === 'string' ? item.button_url : null,
+    button_left_pct: typeof item.button_left_pct === 'number' ? item.button_left_pct : 50,
+    button_top_pct: typeof item.button_top_pct === 'number' ? item.button_top_pct : 44,
+    button_width_pct: typeof item.button_width_pct === 'number' ? item.button_width_pct : 42,
+    sort_order: typeof item.sort_order === 'number' ? item.sort_order : 0,
+    is_active: typeof item.is_active === 'boolean' ? item.is_active : true,
+  };
+}
 
 function dataUrlByteLength(dataUrl: string) {
   const base64 = dataUrl.split(',')[1] || '';
@@ -326,9 +365,20 @@ export default function AdminLandingPage() {
   async function load() {
     try {
       const res = await fetch('/api/landing-blocks/all', { credentials: 'include' });
-      const data = await res.json();
-      if (Array.isArray(data)) setBlocks(data);
-    } catch { setError('โหลดไม่สำเร็จ'); }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(parseErrorMessage(data, 'โหลดไม่สำเร็จ'));
+        return;
+      }
+      if (Array.isArray(data)) {
+        const normalized = data.map(normalizeBlock).filter((item): item is Block => item !== null);
+        setBlocks(normalized);
+      } else {
+        setBlocks([]);
+      }
+    } catch {
+      setError('โหลดไม่สำเร็จ');
+    }
     finally { setLoading(false); }
   }
 
@@ -359,14 +409,26 @@ export default function AdminLandingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type }),
       });
-      const newBlock = await res.json();
-      setBlocks((prev) => [...prev, newBlock]);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const errMsg = parseErrorMessage(payload, 'เพิ่ม block ไม่สำเร็จ');
+        setError(errMsg);
+        return;
+      }
+      const newBlock = normalizeBlock(payload);
+      if (!newBlock) {
+        setError('รูปแบบข้อมูล block ไม่ถูกต้อง');
+        return;
+      }
+      setBlocks((prev) => [...prev.filter((b) => Number.isInteger(b.id) && b.id > 0), newBlock]);
       setSelectedId(newBlock.id);
-    } catch { setError('เพิ่ม block ไม่สำเร็จ'); }
+    } catch {
+      setError('เพิ่ม block ไม่สำเร็จ');
+    }
   }
 
   async function saveBlock() {
-    if (!selectedId) return;
+    if (!Number.isInteger(selectedId)) return;
     setSaving(true);
     setError('');
     try {
@@ -391,11 +453,14 @@ export default function AdminLandingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+      const payload = await res.json().catch(() => null);
       if (!res.ok) {
         if (res.status === 413) throw new Error('payload-too-large');
-        throw new Error('save-failed');
+        const errMsg = parseErrorMessage(payload, 'บันทึกไม่สำเร็จ');
+        throw new Error(errMsg);
       }
-      const updated: Block = await res.json();
+      const updated = normalizeBlock(payload);
+      if (!updated) throw new Error('รูปแบบข้อมูล block ไม่ถูกต้อง');
       setBlocks((prev) => prev.map((b) => (b.id === selectedId ? updated : b)));
       setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 2000);
@@ -403,17 +468,30 @@ export default function AdminLandingPage() {
       if (err instanceof Error && err.message === 'payload-too-large') {
         setError('ข้อมูลรูปภาพใหญ่เกินไป (413) กรุณาลดขนาดรูป หรือใช้ URL รูปแทนการอัปโหลดไฟล์');
       } else {
-        setError('บันทึกไม่สำเร็จ');
+        setError(err instanceof Error ? err.message : 'บันทึกไม่สำเร็จ');
       }
     }
     finally { setSaving(false); }
   }
 
   async function deleteBlock(id: number) {
+    if (!Number.isInteger(id)) {
+      setError('ไม่สามารถลบ block นี้ได้ (id ไม่ถูกต้อง)');
+      return;
+    }
     if (!confirm('ลบ block นี้?')) return;
-    await fetch(`/api/landing-blocks/${id}`, { method: 'DELETE', credentials: 'include' });
-    setBlocks((prev) => prev.filter((b) => b.id !== id));
-    if (selectedId === id) setSelectedId(null);
+    try {
+      const res = await fetch(`/api/landing-blocks/${id}`, { method: 'DELETE', credentials: 'include' });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(parseErrorMessage(payload, 'ลบ block ไม่สำเร็จ'));
+        return;
+      }
+      setBlocks((prev) => prev.filter((b) => b.id !== id));
+      if (selectedId === id) setSelectedId(null);
+    } catch {
+      setError('ลบ block ไม่สำเร็จ');
+    }
   }
 
   async function reorderBlocks(newBlocks: Block[]) {
