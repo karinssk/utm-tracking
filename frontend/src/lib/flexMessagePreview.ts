@@ -139,6 +139,7 @@ interface PreviewInput {
   templateType: TemplateType;
   orderCode: string;
   orderId?: number;
+  customerCode?: string;
   customerName?: string;
   bodyIntroText?: string;
   accountNote?: string | null;
@@ -173,12 +174,15 @@ function pickColor(value: string | null | undefined, fallback: string) {
 }
 
 function interpolateTemplateText(value: string | null | undefined, context: {
+  customerCode?: string;
   customerName?: string;
   netTotal?: number;
 }) {
   if (!value) return '';
+  const customerRef = context.customerCode || context.customerName || '-';
   return String(value)
-    .replace(/\{\{\s*customer_name\s*\}\}/gi, context.customerName || '-')
+    .replace(/\{\{\s*customer_name\s*\}\}/gi, customerRef)
+    .replace(/\{\{\s*customer_code\s*\}\}/gi, customerRef)
     .replace(/\{\{\s*net_total\s*\}\}/gi, fmtBaht(context.netTotal));
 }
 
@@ -188,6 +192,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     templateType,
     orderCode,
     orderId,
+    customerCode,
     customerName,
     bodyIntroText,
     accountNote,
@@ -211,6 +216,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
   const introText = interpolateTemplateText(bodyIntroText || template.body_intro_text, {
+    customerCode,
     customerName,
     netTotal,
   });

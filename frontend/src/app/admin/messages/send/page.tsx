@@ -225,7 +225,7 @@ export default function SendMessagePage() {
       templateType,
       orderCode: previewOrderCode,
       orderId: selectedOrder?.id || 999,
-      customerName: selectedCustomer?.display_name || 'P\'rin',
+      customerCode: selectedCustomer?.customer_code || 'JWD/000001',
       bodyIntroText,
       accountNote: selectedAccountMeta?.account_note || undefined,
       footerNote,

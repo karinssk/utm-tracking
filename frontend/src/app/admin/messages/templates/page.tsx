@@ -301,7 +301,7 @@ function TemplateFlexPreview({ template }: { template: TemplateConfig }) {
       templateType: template.template_type,
       orderCode: 'IMP-INV-250304-001',
       orderId: 101,
-      customerName: 'P\'rin',
+      customerCode: 'JWD/000001',
       accountType: 'KBANK',
       amount: 10000,
       exchangeRate: 4.75,
