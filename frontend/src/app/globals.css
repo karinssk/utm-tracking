@@ -1112,6 +1112,54 @@ textarea {
     0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
+.line-dynamic-hero-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.8vw, 14px);
+  width: 100%;
+  background: linear-gradient(135deg, #00b900 0%, #06c755 60%, #00d430 100%);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: clamp(8px, 1.8vw, 16px) clamp(10px, 2.8vw, 24px);
+  font-size: clamp(12px, 2.5vw, 18px);
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  animation: line-glow-pulse 2.3s ease-in-out infinite;
+}
+
+.line-dynamic-hero-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.32) 50%,
+    transparent 100%
+  );
+  animation: line-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.line-dynamic-hero-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+  filter: brightness(1.1);
+}
+
+.line-dynamic-hero-btn:active:not(:disabled) {
+  transform: scale(0.98);
+  filter: brightness(0.94);
+}
+
 /* Block palette cards in landing page builder */
 .palette-card {
   background: none;

@@ -42,8 +42,12 @@ interface OrderOption {
 const TEMPLATE_TYPES = [
   { value: 'CONFIRM', label: 'คำสั่งซื้อสินค้า (Purchase Order)', accent: '#2e7d32', footer: 'กรุณาตรวจสอบรายละเอียดและยืนยันคำสั่งซื้อ' },
   { value: 'IMPORT_INVOICE', label: 'ใบแจ้งหนี้นำเข้า (Import Invoice)', accent: '#1565c0', footer: 'กรุณาชำระค่าใช้จ่ายนำเข้าตามบิลนี้' },
-  { value: 'RECEIPT', label: 'ใบเสร็จ', accent: '#6a1b9a', footer: 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว' },
+  { value: 'RECEIPT', label: 'ส่งข้อความแบบกำหนดเอง', accent: '#6a1b9a', footer: 'กรุณาตรวจสอบรายละเอียดข้อความก่อนส่ง' },
 ] as const;
+const CUSTOM_HEADER_TITLE_DEFAULT = 'Jawanda Cargo';
+const CUSTOM_HEADER_SUBTITLE_DEFAULT = 'นำเข้าสินค้าจากจีนแบบครบวงจร';
+const LEGACY_RECEIPT_FOOTER = 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว';
+const RECEIPT_FOOTER_DEFAULT = 'End-to-End Logistics Partner';
 
 function toNum(v: string) {
   const n = Number(v);
@@ -85,11 +89,15 @@ export default function SendMessagePage() {
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [customHeaderTitle, setCustomHeaderTitle] = useState(CUSTOM_HEADER_TITLE_DEFAULT);
+  const [customHeaderSubtitle, setCustomHeaderSubtitle] = useState(CUSTOM_HEADER_SUBTITLE_DEFAULT);
   const [bodyIntroText, setBodyIntroText] = useState('');
+  const [bodyIntroColor, setBodyIntroColor] = useState('#0b57b7');
   const [footerNote, setFooterNote] = useState('');
   const [amount, setAmount] = useState('');
   const [exchangeRate, setExchangeRate] = useState('');
   const [exchangeRateCurrency, setExchangeRateCurrency] = useState<'USD' | 'CNY' | 'THB'>('CNY');
+  const [receiptButtonLabel, setReceiptButtonLabel] = useState('');
   const [receiptButtonUrl, setReceiptButtonUrl] = useState('');
   const [applyVat, setApplyVat] = useState(false);
   const [applyWithholding, setApplyWithholding] = useState(false);
@@ -154,7 +162,7 @@ export default function SendMessagePage() {
       .finally(() => setLoadingOrders(false));
   }, [selectedCustomer]);
 
-  const needsExistingOrder = templateType !== 'CONFIRM';
+  const needsExistingOrder = templateType === 'IMPORT_INVOICE';
   const eligibleOrders = useMemo(
     () => customerOrders.filter((order) => order.template_type === 'CONFIRM' && order.status === 'CONFIRMED'),
     [customerOrders],
@@ -205,17 +213,32 @@ export default function SendMessagePage() {
   const selectedTemplateConfig = templateConfigs.find((item) => item.template_type === templateType) || DEFAULT_TEMPLATE_CONFIGS[templateType];
   const selectedTemplateOption = TEMPLATE_TYPES.find((item) => item.value === templateType) || TEMPLATE_TYPES[0];
   const selectedAccountMeta = accountTypes.find((item) => item.code === accountType) || null;
+  const safeBodyIntroColor = /^#[0-9a-fA-F]{6}$/.test(bodyIntroColor) ? bodyIntroColor : '#0b57b7';
 
   const defaultBodyIntroText: Record<TemplateType, string> = {
     CONFIRM: 'รายละเอียดออเดอร์สำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาตรวจสอบข้อมูลให้เรียบร้อย',
     IMPORT_INVOICE: 'รายละเอียดใบแจ้งหนี้นำเข้าสำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nกรุณาชำระค่าใช้จ่ายตามบิลนี้',
-    RECEIPT: 'ใบเสร็จรับเงินสำหรับ {{customer_name}}\nยอดสุทธิ {{net_total}}\nขอบคุณที่ใช้บริการ',
+    RECEIPT: 'ข้อความสำหรับ {{customer_name}}\nโปรดตรวจสอบรายละเอียดด้านล่าง\nขอบคุณที่ใช้บริการ',
   };
 
   useEffect(() => {
     setBodyIntroText(selectedTemplateConfig.body_intro_text || defaultBodyIntroText[templateType]);
-    setFooterNote(selectedTemplateConfig.footer_note || '');
-  }, [selectedTemplateConfig.template_type, selectedTemplateConfig.body_intro_text, selectedTemplateConfig.footer_note]);
+    setBodyIntroColor(selectedTemplateConfig.body_intro_color || '#0b57b7');
+    const rawFooter = selectedTemplateConfig.footer_note || '';
+    if (templateType === 'RECEIPT') {
+      setFooterNote(rawFooter && rawFooter !== LEGACY_RECEIPT_FOOTER ? rawFooter : RECEIPT_FOOTER_DEFAULT);
+    } else {
+      setFooterNote(rawFooter);
+    }
+    setReceiptButtonLabel(selectedTemplateConfig.button_receipt_label || 'คลิกที่นี้');
+  }, [selectedTemplateConfig.template_type, selectedTemplateConfig.body_intro_text, selectedTemplateConfig.body_intro_color, selectedTemplateConfig.footer_note, selectedTemplateConfig.button_receipt_label]);
+
+  useEffect(() => {
+    if (templateType === 'RECEIPT') {
+      setCustomHeaderTitle(CUSTOM_HEADER_TITLE_DEFAULT);
+      setCustomHeaderSubtitle(CUSTOM_HEADER_SUBTITLE_DEFAULT);
+    }
+  }, [templateType]);
 
   useEffect(() => {
     function closeWhenClickOutside(event: MouseEvent) {
@@ -246,11 +269,14 @@ export default function SendMessagePage() {
       orderCode: previewOrderCode,
       orderId: selectedOrder?.id || 999,
       customerCode: selectedCustomer?.customer_code || 'JWD/000001',
+      customHeaderTitle: templateType === 'RECEIPT' ? customHeaderTitle : undefined,
+      customHeaderSubtitle: templateType === 'RECEIPT' ? customHeaderSubtitle : undefined,
       bodyIntroText,
-      accountNote: selectedAccountMeta?.account_note || undefined,
+      bodyIntroColor: safeBodyIntroColor,
+      accountNote: templateType === 'RECEIPT' ? undefined : (selectedAccountMeta?.account_note || undefined),
       footerNote,
       receiptButtonUrl: templateType === 'RECEIPT' ? (receiptButtonUrl || selectedTemplateConfig.button_receipt_url || undefined) : undefined,
-      receiptButtonLabel: selectedTemplateConfig.button_receipt_label || undefined,
+      receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
       accountType: accountType || undefined,
       amount: toNum(amount),
       exchangeRate: toNum(exchangeRate) || undefined,
@@ -358,9 +384,13 @@ export default function SendMessagePage() {
           templateType,
           orderId: selectedOrder ? selectedOrder.id : undefined,
           accountType: accountType || undefined,
+          customHeaderTitle: templateType === 'RECEIPT' ? (customHeaderTitle || undefined) : undefined,
+          customHeaderSubtitle: templateType === 'RECEIPT' ? (customHeaderSubtitle || undefined) : undefined,
           bodyIntroText: bodyIntroText || undefined,
-          accountNote: selectedAccountMeta?.account_note || undefined,
+          bodyIntroColor: templateType === 'RECEIPT' ? safeBodyIntroColor : undefined,
+          accountNote: templateType === 'RECEIPT' ? undefined : (selectedAccountMeta?.account_note || undefined),
           footerNote: footerNote || undefined,
+          receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
           receiptButtonUrl: templateType === 'RECEIPT' ? (receiptButtonUrl || undefined) : undefined,
           amount: amount ? Number(amount) : undefined,
           exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
@@ -398,7 +428,7 @@ export default function SendMessagePage() {
   return (
     <section>
       <h1 className="page-title">ส่งข้อความ Flex Message</h1>
-      <p className="page-subtitle">เริ่มต้นด้วยคำสั่งซื้อสินค้า แล้วค่อยส่งใบแจ้งหนี้นำเข้าและใบเสร็จตาม order เดิม</p>
+      <p className="page-subtitle">ส่งคำสั่งซื้อ, ใบแจ้งหนี้นำเข้า หรือส่งข้อความแบบกำหนดเองให้ลูกค้า</p>
 
       <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'minmax(320px, 1fr) minmax(300px, 420px)', alignItems: 'start' }}>
         <div className="table-shell" style={{ padding: 18 }}>
@@ -568,20 +598,68 @@ export default function SendMessagePage() {
 
             {templateType === 'RECEIPT' && (
               <>
-                <label className="field-label">Receipt Button URL</label>
+                <label className="field-label">Header Title</label>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  type="text"
+                  value={customHeaderTitle}
+                  onChange={(e) => setCustomHeaderTitle(e.target.value)}
+                  placeholder={CUSTOM_HEADER_TITLE_DEFAULT}
+                />
+
+                <label className="field-label">Header Subtitle</label>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  type="text"
+                  value={customHeaderSubtitle}
+                  onChange={(e) => setCustomHeaderSubtitle(e.target.value)}
+                  placeholder={CUSTOM_HEADER_SUBTITLE_DEFAULT}
+                />
+
+                <label className="field-label">Custom Body Color</label>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 64px' }}>
+                  <input
+                    className="input"
+                    style={{ width: '100%' }}
+                    type="text"
+                    value={bodyIntroColor}
+                    onChange={(e) => setBodyIntroColor(e.target.value)}
+                    placeholder="#0b57b7"
+                  />
+                  <input
+                    type="color"
+                    value={safeBodyIntroColor}
+                    onChange={(e) => setBodyIntroColor(e.target.value)}
+                    style={{ width: '100%', height: 42, border: 0, background: 'transparent' }}
+                  />
+                </div>
+
+                <label className="field-label">Custom Button Name</label>
+                <input
+                  className="input"
+                  style={{ width: '100%' }}
+                  type="text"
+                  value={receiptButtonLabel}
+                  onChange={(e) => setReceiptButtonLabel(e.target.value)}
+                  placeholder={selectedTemplateConfig.button_receipt_label || 'คลิกที่นี้'}
+                />
+
+                <label className="field-label">Custom Button URL</label>
                 <input
                   className="input"
                   style={{ width: '100%' }}
                   type="url"
                   value={receiptButtonUrl}
                   onChange={(e) => setReceiptButtonUrl(e.target.value)}
-                  placeholder={selectedTemplateConfig.button_receipt_url || 'https://... (ว่าง = ใช้ค่า default จาก config)'}
+                  placeholder={selectedTemplateConfig.button_receipt_url || 'https://...'}
                 />
               </>
             )}
 
             <label className="field-label">Custom Footer</label>
-            {selectedAccountMeta?.account_note && (
+            {templateType !== 'RECEIPT' && selectedAccountMeta?.account_note && (
               <div style={{ padding: '6px 10px', background: '#f0f4ff', borderRadius: 8, border: '1px solid #c7d7f5', marginBottom: 6, fontSize: 12, color: '#1a3a6e', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                 <span style={{ opacity: 0.5, fontSize: 11, whiteSpace: 'nowrap', marginTop: 1 }}>auto ▸</span>
                 <span style={{ whiteSpace: 'pre-line' }}>{selectedAccountMeta.account_note}</span>
@@ -640,58 +718,62 @@ export default function SendMessagePage() {
               </>
             )}
 
-            <label className="field-label">Account Type</label>
-            <select
-              className="select"
-              style={{ width: '100%' }}
-              value={accountType}
-              onChange={(e) => setAccountType(e.target.value)}
-            >
-              <option value="">-- Select Account Type --</option>
-              {accountTypes.map((a) => (
-                <option key={a.id} value={a.code}>
-                  {a.label} ({a.code})
-                </option>
-              ))}
-            </select>
+            {templateType !== 'RECEIPT' && (
+              <>
+                <label className="field-label">Account Type</label>
+                <select
+                  className="select"
+                  style={{ width: '100%' }}
+                  value={accountType}
+                  onChange={(e) => setAccountType(e.target.value)}
+                >
+                  <option value="">-- Select Account Type --</option>
+                  {accountTypes.map((a) => (
+                    <option key={a.id} value={a.code}>
+                      {a.label} ({a.code})
+                    </option>
+                  ))}
+                </select>
 
-            <label className="field-label">Amount</label>
-            <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
+                <label className="field-label">Amount</label>
+                <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
 
-            <label className="field-label">Exchange Rate</label>
-            <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
-              <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
-              <select
-                className="select"
-                style={{ width: '100%' }}
-                value={exchangeRateCurrency}
-                onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
-              >
-                <option value="CNY">CNY</option>
-                <option value="USD">USD</option>
-                <option value="THB">THB</option>
-              </select>
-            </div>
+                <label className="field-label">Exchange Rate</label>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
+                  <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
+                  <select
+                    className="select"
+                    style={{ width: '100%' }}
+                    value={exchangeRateCurrency}
+                    onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
+                  >
+                    <option value="CNY">CNY</option>
+                    <option value="USD">USD</option>
+                    <option value="THB">THB</option>
+                  </select>
+                </div>
 
-            <label className="field-label">Total (ฐานคำนวณ)</label>
-            <input
-              className="input"
-              style={{ width: '100%', background: '#f7f8fb', color: '#344054' }}
-              type="text"
-              value={summary.base.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-              readOnly
-            />
+                <label className="field-label">Total (ฐานคำนวณ)</label>
+                <input
+                  className="input"
+                  style={{ width: '100%', background: '#f7f8fb', color: '#344054' }}
+                  type="text"
+                  value={summary.base.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  readOnly
+                />
 
-            <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
-                <input type="checkbox" checked={applyVat} onChange={(e) => setApplyVat(e.target.checked)} />
-                Vat 7% (ภาษีมูลค่าเพิ่ม)
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
-                <input type="checkbox" checked={applyWithholding} onChange={(e) => setApplyWithholding(e.target.checked)} />
-                หัก ณ ที่จ่าย 3%
-              </label>
-            </div>
+                <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
+                    <input type="checkbox" checked={applyVat} onChange={(e) => setApplyVat(e.target.checked)} />
+                    Vat 7% (ภาษีมูลค่าเพิ่ม)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, color: '#2a3547' }}>
+                    <input type="checkbox" checked={applyWithholding} onChange={(e) => setApplyWithholding(e.target.checked)} />
+                    หัก ณ ที่จ่าย 3%
+                  </label>
+                </div>
+              </>
+            )}
 
             {result && (
               <div className={`badge ${result.ok ? 'badge-success' : 'badge-danger'}`} style={{ marginTop: 14 }}>

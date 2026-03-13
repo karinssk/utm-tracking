@@ -1,4 +1,6 @@
 export type TemplateType = 'IMPORT_INVOICE' | 'CONFIRM' | 'RECEIPT';
+const LEGACY_RECEIPT_FOOTER = 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว';
+const RECEIPT_FOOTER_DEFAULT = 'End-to-End Logistics Partner';
 
 export interface TemplatePreviewConfig {
   template_type: TemplateType;
@@ -108,7 +110,7 @@ export const DEFAULT_TEMPLATE_CONFIGS: Record<TemplateType, TemplatePreviewConfi
     separator_color: '#f3f4f6',
     footer_separator_color: '#e5e7eb',
     subtitle: 'RECEIPT',
-    footer_note: 'ใบเสร็จสำหรับรายการที่ยืนยันแล้ว',
+    footer_note: RECEIPT_FOOTER_DEFAULT,
     button_confirm_label: 'ยืนยัน',
     button_confirm_color: '#16a34a',
     button_cancel_label: 'ยกเลิก',
@@ -141,7 +143,10 @@ interface PreviewInput {
   orderId?: number;
   customerCode?: string;
   customerName?: string;
+  customHeaderTitle?: string;
+  customHeaderSubtitle?: string;
   bodyIntroText?: string;
+  bodyIntroColor?: string;
   accountNote?: string | null;
   footerNote?: string;
   receiptButtonLabel?: string | null;
@@ -194,7 +199,10 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     orderId,
     customerCode,
     customerName,
+    customHeaderTitle,
+    customHeaderSubtitle,
     bodyIntroText,
+    bodyIntroColor,
     accountNote,
     footerNote,
     receiptButtonLabel,
@@ -216,6 +224,13 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
     : '-';
   const isImportInvoice = templateType === 'IMPORT_INVOICE';
+  const isCustomMessage = templateType === 'RECEIPT';
+  const headerTitle = isCustomMessage
+    ? (customHeaderTitle?.trim() || 'Jawanda Cargo')
+    : template.display_name;
+  const headerSubtitle = isCustomMessage
+    ? (customHeaderSubtitle?.trim() || 'นำเข้าสินค้าจากจีนแบบครบวงจร')
+    : orderCode;
   const introText = interpolateTemplateText(bodyIntroText || template.body_intro_text, {
     customerCode,
     customerName,
@@ -223,22 +238,29 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   });
 
   type RowEntry = [string, string, boolean?]; // [label, value, isBankInfo?]
-  const rows: RowEntry[] = [
-    [template.detail_order_code_label, orderCode],
-    [template.detail_document_type_label, template.subtitle || template.template_type],
-    [template.detail_account_type_label, accountMeta?.label || accountType || '-', true],
-    [template.detail_account_name_label, accountMeta?.account_name || '-', true],
-    [template.detail_account_number_label, accountMeta?.account_number || '-', true],
-    [template.detail_amount_label, isImportInvoice ? fmtBaht(amount) : fmtYuan(amount)],
-  ];
-  if (!isImportInvoice) {
-    rows.push([template.detail_exchange_rate_label, exchangeRateLabel]);
-    rows.push([template.detail_total_label, fmtBaht(totalAmount)]);
+  const rows: RowEntry[] = [];
+  if (!isCustomMessage) {
+    rows.push(
+      [template.detail_order_code_label, orderCode],
+      [template.detail_document_type_label, template.subtitle || template.template_type],
+      [template.detail_account_type_label, accountMeta?.label || accountType || '-', true],
+      [template.detail_account_name_label, accountMeta?.account_name || '-', true],
+      [template.detail_account_number_label, accountMeta?.account_number || '-', true],
+      [template.detail_amount_label, isImportInvoice ? fmtBaht(amount) : fmtYuan(amount)],
+    );
+  }
+  if (!isImportInvoice && !isCustomMessage) {
+    rows.push(
+      [template.detail_exchange_rate_label, exchangeRateLabel],
+      [template.detail_total_label, fmtBaht(totalAmount)],
+    );
   }
 
-  if (applyVat) rows.push([template.detail_vat_label, fmtBaht(vatAmount || 0)]);
-  if (applyWithholding) rows.push([template.detail_withholding_label, fmtBaht(withholdingAmount || 0)]);
-  if (typeof netTotal === 'number') rows.push([template.detail_net_total_label, fmtBaht(netTotal)]);
+  if (!isCustomMessage) {
+    if (applyVat) rows.push([template.detail_vat_label, fmtBaht(vatAmount || 0)]);
+    if (applyWithholding) rows.push([template.detail_withholding_label, fmtBaht(withholdingAmount || 0)]);
+    if (typeof netTotal === 'number') rows.push([template.detail_net_total_label, fmtBaht(netTotal)]);
+  }
 
   const bodyRows = rows.flatMap(([label, value, isBankInfo], idx) => {
     const isNameOrNumber = isBankInfo && (label === template.detail_account_name_label || label === template.detail_account_number_label);
@@ -273,7 +295,12 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   });
 
   const footerParts = [accountNote, footerNote].filter(Boolean).join('\n');
-  const footerText = footerParts || template.footer_note || 'ตัวอย่างข้อความ footer';
+  const normalizedTemplateFooter = templateType === 'RECEIPT' && template.footer_note === LEGACY_RECEIPT_FOOTER
+    ? RECEIPT_FOOTER_DEFAULT
+    : template.footer_note;
+  const footerText = footerParts
+    || normalizedTemplateFooter
+    || (templateType === 'RECEIPT' ? RECEIPT_FOOTER_DEFAULT : 'ตัวอย่างข้อความ footer');
 
   const footerContents: Array<Record<string, unknown>> = [
     { type: 'separator', color: pickColor(template.footer_separator_color, '#e5e7eb') },
@@ -287,18 +314,27 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   ];
 
   const effectiveReceiptUrl = receiptButtonUrl || template.button_receipt_url;
-  if (templateType === 'RECEIPT' && effectiveReceiptUrl) {
+  if (templateType === 'RECEIPT') {
+    const receiptLabel = receiptButtonLabel || template.button_receipt_label || 'คลิกที่นี้';
+    const action = effectiveReceiptUrl
+      ? {
+        type: 'uri',
+        label: receiptLabel,
+        uri: effectiveReceiptUrl,
+      }
+      : {
+        type: 'postback',
+        label: receiptLabel,
+        data: 'type=CUSTOM_BUTTON&action=NO_URL',
+        displayText: receiptLabel,
+      };
     footerContents.push({
       type: 'button',
       style: 'primary',
       height: 'sm',
       margin: 'md',
       color: pickColor(template.accent_color, '#6a1b9a'),
-      action: {
-        type: 'uri',
-        label: receiptButtonLabel || template.button_receipt_label || 'คลิกที่นี้',
-        uri: effectiveReceiptUrl,
-      },
+      action,
     });
   }
 
@@ -338,7 +374,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
 
   return {
     type: 'flex',
-    altText: `${template.display_name} ${orderCode}`,
+    altText: `${headerTitle} ${headerSubtitle}`,
     contents: {
       type: 'bubble',
       body: {
@@ -353,8 +389,8 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
             backgroundColor: pickColor(template.accent_color, '#1565c0'),
             paddingAll: '14px',
             contents: [
-              { type: 'text', text: template.display_name, color: pickColor(template.header_text_color, '#ffffff'), size: 'md', weight: 'bold' },
-              { type: 'text', text: orderCode, color: pickColor(template.header_text_color, '#ffffff'), size: 'xs', margin: 'sm' },
+              { type: 'text', text: headerTitle, color: pickColor(template.header_text_color, '#ffffff'), size: 'md', weight: 'bold' },
+              { type: 'text', text: headerSubtitle, color: pickColor(template.header_text_color, '#ffffff'), size: 'xs', margin: 'sm' },
             ],
           },
           {
@@ -368,12 +404,12 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
                   type: 'text',
                   text: introText,
                   wrap: true,
-                  color: pickColor(template.body_intro_color, '#0b57b7'),
+                  color: pickColor(bodyIntroColor, pickColor(template.body_intro_color, '#0b57b7')),
                   size: 'md',
                   weight: 'bold',
                 }]
                 : []),
-              ...(introText
+              ...(introText && bodyRows.length > 0
                 ? [{
                   type: 'separator',
                   margin: 'md',

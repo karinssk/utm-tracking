@@ -4,11 +4,33 @@ import Image from 'next/image';
 import { Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 
+function SvgPointerIcon({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8.5 20.2l1.2-5.2-3.9-1.8 11.5-8.2-5.6 13.1-2.8-2.4-1.2 4.5z" fill={color} />
+    </svg>
+  );
+}
+
+function SvgBoxIcon({ size = 48, color = '#9ca3af' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3.5 7.4L12 3l8.5 4.4L12 11.7 3.5 7.4z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M3.5 7.4v9.2L12 21l8.5-4.4V7.4" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 11.7V21" stroke={color} strokeWidth="1.6" />
+    </svg>
+  );
+}
+
 type Block = {
   id: number;
-  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card';
+  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card' | 'hero-with-dynamic-add-line';
   image_url: string | null;
   label: string | null;
+  button_url: string | null;
+  button_left_pct: number | null;
+  button_top_pct: number | null;
+  button_width_pct: number | null;
   sort_order: number;
 };
 
@@ -61,9 +83,9 @@ const DEFAULT_FOOTER: FooterCfg = {
   col2_desc: 'ผู้ให้บริการสั่งของจากจีน นำเข้าสินค้าจากจีน ครบวงจร ประสบการณ์มากกว่า 10 ปี พร้อมให้คำปรึกษาฟรี ทีมงานไทย-จีนคอยดูแล',
   col3_title: 'ช่องทางการติดต่อ',
   col3_links: [
-    { label: '💬 สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: 'https://lin.ee/8NQIBi9',                  color: '#06c755' },
-    { label: '📘 ปรึกษาฟรีได้ที่ Facebook',         href: 'https://www.facebook.com/jawandacargo', color: '#1877f2' },
-    { label: '📞 สายด่วน 099-420-7491',              href: 'tel:0994207491',                        color: '#374151' },
+    { label: 'สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: 'https://lin.ee/8NQIBi9',                  color: '#06c755' },
+    { label: 'ปรึกษาฟรีได้ที่ Facebook',         href: 'https://www.facebook.com/jawandacargo', color: '#1877f2' },
+    { label: 'สายด่วน 099-420-7491',              href: 'tel:0994207491',                        color: '#374151' },
   ],
   copyright: '2026 © Jawanda Cargo · jawandacargo-th.com',
 };
@@ -139,6 +161,29 @@ function LandingInner() {
     setAdding(false);
   }
 
+  async function handleDynamicAddLine(block: Block) {
+    const customUrl = block.button_url?.trim();
+    if (!customUrl) {
+      await handleAddFriend();
+      return;
+    }
+    const shouldTrack = /lin\.ee|line\.me/i.test(customUrl);
+    setAdding(true);
+    try {
+      if (shouldTrack && trackingId) {
+        await fetch('/api/pre-follow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trackingId }),
+        });
+      }
+    } catch (err) {
+      console.error('[pre-follow custom]', err);
+    }
+    window.open(customUrl, '_blank');
+    setAdding(false);
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#f0f0f0', margin: 0 }}>
       {/* ── Dynamic Header ── */}
@@ -172,7 +217,9 @@ function LandingInner() {
       <main style={{ background: '#fff', minHeight: 200 }}>
         {blocks.length === 0 && !loading && (
           <div style={{ padding: '80px 20px', textAlign: 'center', color: '#9ca3af', maxWidth: 840, margin: '0 auto' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+            <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+              <SvgBoxIcon />
+            </div>
             <p>ยังไม่มีเนื้อหา</p>
           </div>
         )}
@@ -203,6 +250,42 @@ function LandingInner() {
                     <Image src="/line-logo.png" alt="LINE" width={30} height={30} />
                     <span style={{ lineHeight: 1.2 }}>
                       {adding ? 'กำลังเปิด...' : (block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          /* ── Hero with Dynamic Add LINE area ── */
+          if (block.type === 'hero-with-dynamic-add-line' && block.image_url) {
+            const leftPct = Math.min(95, Math.max(0, Number(block.button_left_pct ?? 50)));
+            const topPct = Math.min(95, Math.max(0, Number(block.button_top_pct ?? 44)));
+            const widthPct = Math.min(95, Math.max(8, Number(block.button_width_pct ?? 42)));
+
+            return (
+              <div key={block.id} style={{ position: 'relative', width: '100%', lineHeight: 0 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={block.image_url} alt={block.label || ''} style={{ width: '100%', display: 'block', height: 'auto' }} />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: `${topPct}%`,
+                    left: `${leftPct}%`,
+                    width: `${widthPct}%`,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 10,
+                  }}
+                >
+                  <button
+                    className="line-dynamic-hero-btn"
+                    onClick={() => handleDynamicAddLine(block)}
+                    disabled={adding || loading}
+                    style={{ opacity: adding ? 0.7 : 1, cursor: adding || loading ? 'not-allowed' : 'pointer' }}
+                  >
+                    <span style={{ background: '#fff', borderRadius: 999, width: 30, height: 30, color: '#06c755', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, flexShrink: 0, fontSize: 22 }}>+</span>
+                    <span style={{ lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {adding ? 'กำลังเปิด...' : (block.label || '@JAWANDACARGO')}
                     </span>
                   </button>
                 </div>
@@ -246,7 +329,9 @@ function LandingInner() {
                     <Image src="/line-logo.png" alt="LINE" width={44} height={44} />
                   </span>
                   <span>{adding ? 'กำลังเปิด...' : (block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์')}</span>
-                  <span style={{ fontSize: 'clamp(24px, 4vw, 36px)', lineHeight: 1, flexShrink: 0 }}>👆</span>
+                  <span style={{ lineHeight: 1, flexShrink: 0, display: 'inline-flex' }}>
+                    <SvgPointerIcon size={26} color="#ffffff" />
+                  </span>
                 </button>
               </div>
             );
@@ -277,7 +362,9 @@ function LandingInner() {
                       <Image src="/line-logo.png" alt="LINE" width={44} height={44} />
                     </span>
                     <span>{adding ? 'กำลังเปิด...' : (block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์')}</span>
-                    <span style={{ fontSize: 'clamp(24px, 4vw, 36px)', lineHeight: 1, flexShrink: 0 }}>👆</span>
+                    <span style={{ lineHeight: 1, flexShrink: 0, display: 'inline-flex' }}>
+                      <SvgPointerIcon size={26} color="#ffffff" />
+                    </span>
                   </button>
                 </div>
               </div>

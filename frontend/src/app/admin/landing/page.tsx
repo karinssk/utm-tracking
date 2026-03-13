@@ -3,6 +3,74 @@
 import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 
+function SvgImageIcon({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke={color} strokeWidth="1.8" />
+      <circle cx="9" cy="10" r="1.7" fill={color} />
+      <path d="M5.6 17l4.3-4.2 3.2 3.2 2.4-2.5 2.9 3.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SvgHeroIcon({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" stroke={color} strokeWidth="1.8" />
+      <path d="M6.2 15.8l3.8-3.8 2.8 2.7 2.1-2.1 2.9 3.2" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="8.3" cy="9.2" r="1.2" fill={color} />
+    </svg>
+  );
+}
+
+function SvgChatIcon({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M7 18l-3 2v-3.3c-.9-1.2-1.4-2.7-1.4-4.3C2.6 8 6.9 4.5 12.2 4.5S21.8 8 21.8 12.4 17.5 20.2 12.2 20.2c-1.8 0-3.6-.4-5.2-1.2z" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="9.2" cy="12.2" r="1" fill={color} />
+      <circle cx="12.2" cy="12.2" r="1" fill={color} />
+      <circle cx="15.2" cy="12.2" r="1" fill={color} />
+    </svg>
+  );
+}
+
+function SvgDocIcon({ size = 18, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8 3.8h6.7L20.2 9v11a2.2 2.2 0 0 1-2.2 2.2H8A2.2 2.2 0 0 1 5.8 20V6A2.2 2.2 0 0 1 8 3.8z" stroke={color} strokeWidth="1.8" />
+      <path d="M14.5 3.8V9h5.7" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9.2 13.1h5.6M9.2 16.3h5.6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SvgPointerIcon({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M8.5 20.2l1.2-5.2-3.9-1.8 11.5-8.2-5.6 13.1-2.8-2.4-1.2 4.5z" fill={color} />
+    </svg>
+  );
+}
+
+function SvgEditIcon({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 20h4.2L19.1 9.1a1.9 1.9 0 0 0 0-2.7l-1.5-1.5a1.9 1.9 0 0 0-2.7 0L4 15.8V20z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12.8 6.9l4.3 4.3" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SvgExternalIcon({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M14.5 4.8h4.7v4.7" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 14l9.2-9.2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M19.2 12.5V19a1.9 1.9 0 0 1-1.9 1.9H5.8A1.9 1.9 0 0 1 3.9 19V7.5A1.9 1.9 0 0 1 5.8 5.6h6.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ─── Block Thumbnail Components ──────────────────────────────────────────────
 function ThumbHero() {
   return (
@@ -78,7 +146,9 @@ function ThumbLineBanner() {
             <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#06c755' }} />
           </div>
           <div style={{ flex: 1, height: 2, background: 'rgba(255,255,255,0.9)', borderRadius: 2 }} />
-          <div style={{ width: 4, height: 6, fontSize: 5, color: '#fff', lineHeight: 1 }}>👆</div>
+          <div style={{ width: 6, height: 6, color: '#fff', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SvgPointerIcon size={6} color="#ffffff" />
+          </div>
         </div>
       </div>
     </div>
@@ -103,7 +173,9 @@ function ThumbLineCard() {
               <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#06c755' }} />
             </div>
             <div style={{ flex: 1, height: 2, background: 'rgba(255,255,255,0.9)', borderRadius: 2 }} />
-            <div style={{ fontSize: 5, color: '#fff', lineHeight: 1 }}>👆</div>
+            <div style={{ width: 6, height: 6, color: '#fff', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <SvgPointerIcon size={6} color="#ffffff" />
+            </div>
           </div>
         </div>
       </div>
@@ -137,19 +209,43 @@ function ThumbHeroWithBtn() {
   );
 }
 
+function ThumbHeroDynamicAddLine() {
+  return (
+    <div style={{ width: 62, height: 50, borderRadius: 5, overflow: 'hidden', flexShrink: 0, border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ height: 10, background: '#1a2744', display: 'flex', alignItems: 'center', padding: '0 4px', gap: 2 }}>
+        <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e87722' }} />
+        <div style={{ flex: 1, height: 2, background: 'rgba(255,255,255,0.35)', borderRadius: 2 }} />
+      </div>
+      <div style={{ height: 4, background: '#e87722' }} />
+      <div style={{ flex: 1, background: 'linear-gradient(135deg,#dbeafe,#bfdbfe)', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#f8fafc,#e2e8f0)', opacity: 0.9 }} />
+        <div style={{ position: 'absolute', left: 24, top: 15, width: 32, height: 14, borderRadius: 7, background: '#06c755', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }} />
+      </div>
+    </div>
+  );
+}
+
 type Block = {
   id: number;
-  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card';
+  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card' | 'hero-with-dynamic-add-line';
   image_url: string | null;
   label: string | null;
+  button_url: string | null;
+  button_left_pct: number | null;
+  button_top_pct: number | null;
+  button_width_pct: number | null;
   sort_order: number;
   is_active: boolean;
 };
 
 type EditForm = {
-  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card';
+  type: 'image' | 'add_friend' | 'hero-full-width' | 'hero-full-width-btn-left' | 'add_friend_banner' | 'add_friend_card' | 'hero-with-dynamic-add-line';
   image_url: string;
   label: string;
+  button_url: string;
+  button_left_pct: number;
+  button_top_pct: number;
+  button_width_pct: number;
   is_active: boolean;
 };
 
@@ -207,7 +303,16 @@ export default function AdminLandingPage() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<EditForm>({ type: 'image', image_url: '', label: '', is_active: true });
+  const [editForm, setEditForm] = useState<EditForm>({
+    type: 'image',
+    image_url: '',
+    label: '',
+    button_url: '',
+    button_left_pct: 50,
+    button_top_pct: 44,
+    button_width_pct: 42,
+    is_active: true,
+  });
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -236,6 +341,10 @@ export default function AdminLandingPage() {
         type: selectedBlock.type,
         image_url: selectedBlock.image_url ?? '',
         label: selectedBlock.label ?? '',
+        button_url: selectedBlock.button_url ?? '',
+        button_left_pct: selectedBlock.button_left_pct ?? 50,
+        button_top_pct: selectedBlock.button_top_pct ?? 44,
+        button_width_pct: selectedBlock.button_width_pct ?? 42,
         is_active: selectedBlock.is_active,
       });
     }
@@ -271,6 +380,10 @@ export default function AdminLandingPage() {
         type: editForm.type,
         image_url: editForm.image_url || null,
         label: editForm.label || null,
+        button_url: editForm.button_url || null,
+        button_left_pct: editForm.button_left_pct,
+        button_top_pct: editForm.button_top_pct,
+        button_width_pct: editForm.button_width_pct,
         is_active: editForm.is_active,
       };
       const res = await fetch(`/api/landing-blocks/${selectedId}`, {
@@ -284,7 +397,7 @@ export default function AdminLandingPage() {
       }
       const updated: Block = await res.json();
       setBlocks((prev) => prev.map((b) => (b.id === selectedId ? updated : b)));
-      setSaveMsg('✓ Saved');
+      setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 2000);
     } catch (err) {
       if (err instanceof Error && err.message === 'payload-too-large') {
@@ -358,6 +471,7 @@ export default function AdminLandingPage() {
   const PALETTE_ITEMS: { type: Block['type']; label: string; sub: string; Thumb: () => React.ReactElement }[] = [
     { type: 'hero-full-width',          label: 'Hero Full-Width',          sub: '+ Add Hero Full-Width',          Thumb: ThumbHero        },
     { type: 'hero-full-width-btn-left', label: 'Hero + LINE Btn Left',     sub: '+ Add Hero with Button',         Thumb: ThumbHeroWithBtn },
+    { type: 'hero-with-dynamic-add-line', label: 'Hero Dynamic Add LINE',  sub: '+ Add Hero Dynamic Add LINE',    Thumb: ThumbHeroDynamicAddLine },
     { type: 'image',                    label: 'Image Block',               sub: '+ Add Image Block',              Thumb: ThumbImage       },
     { type: 'add_friend_banner',        label: 'LINE Banner (Full-Width)',  sub: '+ Add LINE Banner',              Thumb: ThumbLineBanner  },
     { type: 'add_friend_card',          label: 'LINE Banner (Card)',        sub: '+ Add LINE Card',                Thumb: ThumbLineCard    },
@@ -367,6 +481,7 @@ export default function AdminLandingPage() {
   const TYPE_COLOR: Record<Block['type'], string> = {
     'hero-full-width':          '#6366f1',
     'hero-full-width-btn-left': '#8b5cf6',
+    'hero-with-dynamic-add-line': '#0ea5e9',
     'image':                    '#f97316',
     'add_friend_banner':        '#16a34a',
     'add_friend_card':          '#15803d',
@@ -444,7 +559,7 @@ export default function AdminLandingPage() {
             >
               <div style={{ width: 8, height: 8, borderRadius: 2, background: TYPE_COLOR[b.type], flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontWeight: 500 }}>
-                {b.label || `${b.type === 'hero-full-width' ? 'Hero' : b.type === 'hero-full-width-btn-left' ? 'Hero+BTN' : b.type === 'image' ? 'Image' : b.type === 'add_friend_banner' ? 'LINE Banner' : b.type === 'add_friend_card' ? 'LINE Card' : 'LINE'} ${idx + 1}`}
+                {b.label || `${b.type === 'hero-full-width' ? 'Hero' : b.type === 'hero-full-width-btn-left' ? 'Hero+BTN' : b.type === 'hero-with-dynamic-add-line' ? 'Hero Dynamic' : b.type === 'image' ? 'Image' : b.type === 'add_friend_banner' ? 'LINE Banner' : b.type === 'add_friend_card' ? 'LINE Card' : 'LINE'} ${idx + 1}`}
               </span>
               <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>#{idx + 1}</span>
             </div>
@@ -472,7 +587,9 @@ export default function AdminLandingPage() {
         {/* Empty state */}
         {!loading && blocks.length === 0 && (
           <div style={{ background: '#fff', padding: '60px 20px', textAlign: 'center', color: '#9ca3af' }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>📄</div>
+            <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'center' }}>
+              <SvgDocIcon size={34} color="#9ca3af" />
+            </div>
             <p style={{ fontSize: 14 }}>ยังไม่มี block — คลิก block ทางซ้ายเพื่อเพิ่ม</p>
           </div>
         )}
@@ -510,7 +627,13 @@ export default function AdminLandingPage() {
                   : 'none',
                 outlineOffset: isSelected ? -2 : 0,
                 opacity: isDragging ? 0.4 : block.is_active ? 1 : 0.5,
-                background: block.type === 'add_friend' ? '#f0fdf4' : (block.type === 'add_friend_banner' || block.type === 'add_friend_card') ? '#fff7ed' : block.type === 'hero-full-width-btn-left' && !block.image_url ? '#faf5ff' : '#fff',
+                background: block.type === 'add_friend'
+                  ? '#f0fdf4'
+                  : (block.type === 'add_friend_banner' || block.type === 'add_friend_card')
+                    ? '#fff7ed'
+                    : (block.type === 'hero-full-width-btn-left' || block.type === 'hero-with-dynamic-add-line') && !block.image_url
+                      ? '#eff6ff'
+                      : '#fff',
                 transition: 'outline 0.1s',
               }}
             >
@@ -531,6 +654,7 @@ export default function AdminLandingPage() {
                   <span style={{ color: '#fff', fontSize: 11, opacity: 0.7 }}>
                     {block.type === 'hero-full-width' ? 'Hero Full-Width' :
                      block.type === 'hero-full-width-btn-left' ? 'Hero + LINE Btn' :
+                     block.type === 'hero-with-dynamic-add-line' ? 'Hero Dynamic Add LINE' :
                      block.type === 'image' ? 'Image Block' :
                      block.type === 'add_friend_banner' ? 'LINE Banner' :
                      block.type === 'add_friend_card' ? 'LINE Card' : 'LINE Button'} · #{idx + 1}
@@ -541,7 +665,7 @@ export default function AdminLandingPage() {
                     style={{ background: isSelected ? '#f97316' : '#6b7280', color: '#fff', borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}
                     onClick={(e) => { e.stopPropagation(); setSelectedId(isSelected ? null : block.id); }}
                   >
-                    {isSelected ? '✓ Editing' : '✏ Edit'}
+                    {isSelected ? 'Editing' : 'Edit'}
                   </span>
                   <span
                     onClick={(e) => { e.stopPropagation(); deleteBlock(block.id); }}
@@ -560,13 +684,13 @@ export default function AdminLandingPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={block.image_url} alt={block.label || ''} style={{ width: '100%', display: 'block' }} />
                       <span style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(99,102,241,0.85)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 6px' }}>
-                        🌅 FULL-WIDTH
+                        HERO FULL-WIDTH
                       </span>
                     </div>
                   )
                   : (
                     <div style={{ height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#818cf8', background: '#f5f3ff', borderBottom: '1px dashed #c7d2fe', gap: 6 }}>
-                      <span style={{ fontSize: 32 }}>🌅</span>
+                      <SvgHeroIcon size={30} color="#818cf8" />
                       <span style={{ fontSize: 12 }}>Hero Full-Width — คลิก Edit เพื่อเพิ่มรูปภาพ</span>
                     </div>
                   )
@@ -587,18 +711,79 @@ export default function AdminLandingPage() {
                           boxShadow: '0 3px 12px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.3)',
                           whiteSpace: 'nowrap',
                         }}>
-                          💬 {block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์'}
+                          <SvgChatIcon size={12} color="#ffffff" /> {block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์'}
                         </div>
                       </div>
                       <span style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(139,92,246,0.85)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 6px' }}>
-                        🌅 HERO + LINE BTN
+                        HERO + LINE BTN
                       </span>
                     </div>
                   )
                   : (
                     <div style={{ height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', background: '#f5f3ff', borderBottom: '1px dashed #ddd6fe', gap: 6 }}>
-                      <span style={{ fontSize: 32 }}>🌅💬</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <SvgHeroIcon size={28} color="#8b5cf6" />
+                        <SvgChatIcon size={24} color="#8b5cf6" />
+                      </div>
                       <span style={{ fontSize: 12 }}>Hero + LINE Button — คลิก Edit เพื่อเพิ่มรูปภาพ</span>
+                    </div>
+                  )
+              )}
+              {block.type === 'hero-with-dynamic-add-line' && (
+                ((isSelected ? (editForm.image_url || block.image_url) : block.image_url))
+                  ? (
+                    <div style={{ position: 'relative', lineHeight: 0 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={(isSelected ? (editForm.image_url || block.image_url) : block.image_url) || ''}
+                        alt={(isSelected ? (editForm.label || block.label) : block.label) || ''}
+                        style={{ width: '100%', display: 'block' }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: `${Math.min(95, Math.max(0, Number(isSelected ? editForm.button_top_pct : (block.button_top_pct ?? 44))))}%`,
+                          left: `${Math.min(95, Math.max(0, Number(isSelected ? editForm.button_left_pct : (block.button_left_pct ?? 50))))}%`,
+                          width: `${Math.min(95, Math.max(8, Number(isSelected ? editForm.button_width_pct : (block.button_width_pct ?? 42))))}%`,
+                          transform: 'translate(-50%, -50%)',
+                          zIndex: 2,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 8,
+                            width: '100%',
+                            borderRadius: 999,
+                            padding: '8px 14px',
+                            color: '#fff',
+                            fontSize: 13,
+                            fontWeight: 900,
+                            background: 'linear-gradient(135deg,#00b900,#06c755)',
+                            boxShadow: '0 6px 20px rgba(0,0,0,0.3), 0 0 0 2px rgba(255,255,255,0.35)',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <span style={{ background: '#fff', borderRadius: 999, width: 18, height: 18, color: '#06c755', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>+</span>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {(isSelected ? editForm.label : block.label) || '@JAWANDACARGO'}
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(14,165,233,0.92)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 6px' }}>
+                        HERO DYNAMIC ADD LINE
+                      </span>
+                    </div>
+                  )
+                  : (
+                    <div style={{ height: 132, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#0284c7', background: '#eff6ff', borderBottom: '1px dashed #93c5fd', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <SvgHeroIcon size={28} color="#0284c7" />
+                        <SvgChatIcon size={24} color="#0284c7" />
+                      </div>
+                      <span style={{ fontSize: 12 }}>Hero Dynamic Add LINE — คลิก Edit เพื่อเพิ่มรูปภาพ</span>
                     </div>
                   )
               )}
@@ -613,7 +798,7 @@ export default function AdminLandingPage() {
                       height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                       color: '#9ca3af', background: '#f9fafb', borderBottom: '1px dashed #e5e7eb', gap: 6
                     }}>
-                      <span style={{ fontSize: 32 }}>🖼</span>
+                      <SvgImageIcon size={30} color="#9ca3af" />
                       <span style={{ fontSize: 12 }}>คลิก Edit เพื่อเพิ่มรูปภาพ</span>
                     </div>
                   )
@@ -640,7 +825,9 @@ export default function AdminLandingPage() {
                       <span style={{ width: 22, height: 22, background: '#06c755', borderRadius: '50%', display: 'block' }} />
                     </span>
                     <span style={{ flex: 1, textAlign: 'center' }}>{block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์'}</span>
-                    <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>👆</span>
+                    <span style={{ lineHeight: 1, flexShrink: 0, display: 'inline-flex' }}>
+                      <SvgPointerIcon size={18} color="#ffffff" />
+                    </span>
                   </div>
                 </div>
               )}
@@ -667,7 +854,9 @@ export default function AdminLandingPage() {
                         <span style={{ width: 18, height: 18, background: '#06c755', borderRadius: '50%', display: 'block' }} />
                       </span>
                       <span style={{ flex: 1, textAlign: 'center' }}>{block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์'}</span>
-                      <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>👆</span>
+                      <span style={{ lineHeight: 1, flexShrink: 0, display: 'inline-flex' }}>
+                        <SvgPointerIcon size={15} color="#ffffff" />
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -681,7 +870,9 @@ export default function AdminLandingPage() {
                     display: 'flex', alignItems: 'center', gap: 12,
                     color: '#fff', boxShadow: '0 4px 14px rgba(6, 199, 85, 0.35)',
                   }}>
-                    <span style={{ fontSize: 28, lineHeight: 1 }}>💬</span>
+                    <span style={{ lineHeight: 1, display: 'inline-flex' }}>
+                      <SvgChatIcon size={24} color="#ffffff" />
+                    </span>
                     <span style={{ fontWeight: 800, fontSize: 16 }}>
                       {block.label || 'ทักตอนนี้! เพื่อรับสิทธิ์'}
                     </span>
@@ -724,14 +915,18 @@ export default function AdminLandingPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <div>
-            <p style={{ fontWeight: 800, fontSize: 14, color: '#111827' }}>✏ Inline Editor</p>
+            <p style={{ fontWeight: 800, fontSize: 14, color: '#111827', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <SvgEditIcon size={14} color="#111827" />
+              <span>Inline Editor</span>
+            </p>
             <p style={{ fontSize: 11, color: '#9ca3af' }}>
               Editing: {
-                selectedBlock.type === 'hero-full-width' ? '🌅 Hero Full-Width' :
-                selectedBlock.type === 'hero-full-width-btn-left' ? '🌅💬 Hero + LINE Button' :
-                selectedBlock.type === 'image' ? '🖼 Image Block' :
-                selectedBlock.type === 'add_friend_banner' ? '🟢 LINE Banner (Full)' :
-                selectedBlock.type === 'add_friend_card' ? '🟢 LINE Banner (Card)' : '💚 LINE Button'
+                selectedBlock.type === 'hero-full-width' ? 'Hero Full-Width' :
+                selectedBlock.type === 'hero-full-width-btn-left' ? 'Hero + LINE Button' :
+                selectedBlock.type === 'hero-with-dynamic-add-line' ? 'Hero Dynamic Add LINE' :
+                selectedBlock.type === 'image' ? 'Image Block' :
+                selectedBlock.type === 'add_friend_banner' ? 'LINE Banner (Full)' :
+                selectedBlock.type === 'add_friend_card' ? 'LINE Banner (Card)' : 'LINE Button'
               }
             </p>
           </div>
@@ -743,7 +938,7 @@ export default function AdminLandingPage() {
 
         <div style={{ borderTop: '1px solid #e5e7eb', marginTop: 10, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Image URL / Upload (image blocks only) */}
-          {(selectedBlock.type === 'image' || selectedBlock.type === 'hero-full-width' || selectedBlock.type === 'hero-full-width-btn-left' || selectedBlock.type === 'add_friend_banner' || selectedBlock.type === 'add_friend_card') && (
+          {(selectedBlock.type === 'image' || selectedBlock.type === 'hero-full-width' || selectedBlock.type === 'hero-full-width-btn-left' || selectedBlock.type === 'hero-with-dynamic-add-line' || selectedBlock.type === 'add_friend_banner' || selectedBlock.type === 'add_friend_card') && (
             <div>
               <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {(selectedBlock.type === 'add_friend_banner' || selectedBlock.type === 'add_friend_card') ? 'Background Image (optional)' : 'Image'}
@@ -766,7 +961,7 @@ export default function AdminLandingPage() {
                   cursor: 'pointer', color: '#374151', marginBottom: 6,
                 }}
               >
-                {uploadingImg ? '⏳ กำลังโหลด...' : ' อัปโหลดรูปภาพ'}
+                {uploadingImg ? 'กำลังโหลด...' : 'อัปโหลดรูปภาพ'}
                 <input
                   type="file"
                   accept="image/*"
@@ -789,16 +984,81 @@ export default function AdminLandingPage() {
           {/* Label */}
           <div>
             <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {selectedBlock.type === 'add_friend' ? 'Button Label' : 'Caption (optional)'}
+              {(selectedBlock.type === 'add_friend' || selectedBlock.type === 'hero-with-dynamic-add-line') ? 'Button Label' : 'Caption (optional)'}
             </label>
             <input
               type="text"
               className="field-input"
               value={editForm.label}
               onChange={(e) => setEditForm((f) => ({ ...f, label: e.target.value }))}
-              placeholder={selectedBlock.type === 'add_friend' ? 'ทักตอนนี้! เพื่อรับสิทธิ์' : 'ชื่อรูปภาพ'}
+              placeholder={(selectedBlock.type === 'add_friend' || selectedBlock.type === 'hero-with-dynamic-add-line') ? '@JAWANDACARGO' : 'ชื่อรูปภาพ'}
             />
           </div>
+
+          {selectedBlock.type === 'hero-with-dynamic-add-line' && (
+            <>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Button URL (optional)
+                </label>
+                <input
+                  type="text"
+                  className="field-input"
+                  value={editForm.button_url}
+                  onChange={(e) => setEditForm((f) => ({ ...f, button_url: e.target.value }))}
+                  placeholder="https://lin.ee/..."
+                />
+                <p style={{ marginTop: 5, fontSize: 11, color: '#6b7280' }}>
+                  เว้นว่างได้ ระบบจะใช้ลิงก์ Add LINE ค่าเริ่มต้น
+                </p>
+              </div>
+
+              <div style={{ padding: '10px 10px 8px', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Button Area
+                </p>
+
+                <label style={{ display: 'block', fontSize: 11, color: '#6b7280' }}>
+                  Left: {Math.round(editForm.button_left_pct)}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={95}
+                  step={1}
+                  value={editForm.button_left_pct}
+                  onChange={(e) => setEditForm((f) => ({ ...f, button_left_pct: Number(e.target.value) }))}
+                  style={{ width: '100%' }}
+                />
+
+                <label style={{ display: 'block', fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                  Top: {Math.round(editForm.button_top_pct)}%
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={95}
+                  step={1}
+                  value={editForm.button_top_pct}
+                  onChange={(e) => setEditForm((f) => ({ ...f, button_top_pct: Number(e.target.value) }))}
+                  style={{ width: '100%' }}
+                />
+
+                <label style={{ display: 'block', fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                  Width: {Math.round(editForm.button_width_pct)}%
+                </label>
+                <input
+                  type="range"
+                  min={8}
+                  max={95}
+                  step={1}
+                  value={editForm.button_width_pct}
+                  onChange={(e) => setEditForm((f) => ({ ...f, button_width_pct: Number(e.target.value) }))}
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </>
+          )}
 
           {/* Active toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
@@ -891,7 +1151,8 @@ export default function AdminLandingPage() {
           className="btn btn-soft"
           style={{ fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6, height: 36 }}
         >
-          ▶ ดูหน้าจริง
+          <SvgExternalIcon size={13} color="currentColor" />
+          <span>ดูหน้าจริง</span>
         </a>
       </div>
 
