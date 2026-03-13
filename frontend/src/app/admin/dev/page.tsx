@@ -23,6 +23,12 @@ const ACTIONS: Action[] = [
     endpoint: '/api/dev/messages',
     danger: true,
   },
+  {
+    label: 'ลบ Users ทั้งหมด',
+    description: 'ลบบัญชีผู้ใช้ทั้งหมดออกจากระบบ',
+    endpoint: '/api/dev/users',
+    danger: true,
+  },
 ];
 
 export default function DevToolsPage() {

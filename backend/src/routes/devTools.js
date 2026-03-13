@@ -27,4 +27,15 @@ router.delete('/messages', requireAuth, async (_req, res) => {
   }
 });
 
+// DELETE /api/dev/users — delete all users
+router.delete('/users', requireAuth, async (_req, res) => {
+  try {
+    await pool.query('DELETE FROM users');
+    res.json({ ok: true, message: 'All users deleted' });
+  } catch (err) {
+    console.error('[dev/users delete]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
