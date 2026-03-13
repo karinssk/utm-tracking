@@ -693,7 +693,7 @@ export default function AdminLandingPage() {
                   cursor: 'pointer', color: '#374151', marginBottom: 6,
                 }}
               >
-                {uploadingImg ? '⏳ กำลังโหลด...' : '📁 อัปโหลดรูปภาพ'}
+                {uploadingImg ? '⏳ กำลังโหลด...' : ' อัปโหลดรูปภาพ'}
                 <input
                   type="file"
                   accept="image/*"

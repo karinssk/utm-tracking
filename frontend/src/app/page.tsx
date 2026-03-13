@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 type Block = {
@@ -316,50 +316,48 @@ function LandingInner() {
       </main>
 
       {/* ── Dynamic Footer ── */}
-      <footer style={{ background: '#0f1c36', color: '#8899aa', marginTop: 0 }}>
-        <div style={{ maxWidth: 840, margin: '0 auto', padding: '36px 16px 24px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28, marginBottom: 28 }}>
-
-            {/* Column 1: Contact lines */}
-            <div>
-              <p style={{ color: '#fff', fontWeight: 700, marginBottom: 12, fontSize: 14, borderBottom: '2px solid #e87722', paddingBottom: 6, display: 'inline-block' }}>
-                {footer.col1_title}
-              </p>
-              <p style={{ fontSize: 13, lineHeight: 2.0, marginTop: 8 }}>
+      <footer className="landing-footer">
+        <div className="landing-footer-shell">
+          <div className="landing-footer-grid">
+            <section className="landing-footer-column">
+              <p className="landing-footer-title">{footer.col1_title}</p>
+              <ul className="landing-footer-contact-list">
                 {footer.col1_lines.map((line, i) => (
-                  <span key={i}>{line}{i < footer.col1_lines.length - 1 && <br />}</span>
+                  <li key={`${line}-${i}`}>{line}</li>
                 ))}
-              </p>
-            </div>
+              </ul>
+            </section>
 
-            {/* Column 2: About */}
-            <div>
-              <p style={{ color: '#fff', fontWeight: 700, marginBottom: 12, fontSize: 14, borderBottom: '2px solid #e87722', paddingBottom: 6, display: 'inline-block' }}>
-                {footer.col2_title}
-              </p>
-              <p style={{ color: '#e87722', fontWeight: 700, fontSize: 14, marginTop: 8, marginBottom: 8 }}>{footer.col2_brand}</p>
-              <p style={{ fontSize: 13, lineHeight: 1.8 }}>{footer.col2_desc}</p>
-            </div>
+            <section className="landing-footer-column">
+              <p className="landing-footer-title">{footer.col2_title}</p>
+              <p className="landing-footer-brand">{footer.col2_brand}</p>
+              <p className="landing-footer-description">{footer.col2_desc}</p>
+            </section>
 
-            {/* Column 3: Social links */}
-            <div>
-              <p style={{ color: '#fff', fontWeight: 700, marginBottom: 12, fontSize: 14, borderBottom: '2px solid #e87722', paddingBottom: 6, display: 'inline-block' }}>
-                {footer.col3_title}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {footer.col3_links.map((link, i) => (
-                  <a key={i} href={link.href} target={link.href.startsWith('tel:') ? undefined : '_blank'} rel="noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, background: link.color, color: '#fff', borderRadius: 8, padding: '10px 14px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
-                    {link.label}
-                  </a>
-                ))}
+            <section className="landing-footer-column landing-footer-social-col">
+              <p className="landing-footer-title">{footer.col3_title}</p>
+              <div className="landing-footer-links">
+                {footer.col3_links.map((link, i) => {
+                  const linkStyle = {
+                    '--footer-link-color': link.color || '#374151',
+                  } as CSSProperties;
+                  return (
+                    <a
+                      key={i}
+                      href={link.href}
+                      target={link.href.startsWith('tel:') ? undefined : '_blank'}
+                      rel={link.href.startsWith('tel:') ? undefined : 'noreferrer'}
+                      className="landing-footer-link"
+                      style={linkStyle}
+                    >
+                      {link.label}
+                    </a>
+                  );
+                })}
               </div>
-            </div>
-
+            </section>
           </div>
-          <div style={{ borderTop: '1px solid #1e2e4a', paddingTop: 16, fontSize: 12, textAlign: 'center', color: '#3a4a5a' }}>
-            {footer.copyright}
-          </div>
+          <div className="landing-footer-copyright">{footer.copyright}</div>
         </div>
       </footer>
     </div>

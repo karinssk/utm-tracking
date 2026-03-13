@@ -242,7 +242,7 @@ export default function AdminSitePage() {
               <label
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 32, fontSize: 12, fontWeight: 600, background: '#f9fafb', border: '1.5px dashed #d1d5db', borderRadius: 7, cursor: 'pointer', color: '#374151' }}
               >
-                {uploadingLogo ? '⏳ กำลังโหลด...' : '📁 อัปโหลดโลโก้'}
+                {uploadingLogo ? '⏳ กำลังโหลด...' : ' อัปโหลดโลโก้'}
                 <input ref={logoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleLogoFile} />
               </label>
               <TextInput value={header.logo_url} onChange={(v) => setHeader((h) => h ? { ...h, logo_url: v } : h)} placeholder="URL โลโก้" />
@@ -289,7 +289,7 @@ export default function AdminSitePage() {
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
-              <p style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>📋 Footer</p>
+              <p style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}> Footer</p>
               <p style={{ fontSize: 12, color: '#9ca3af' }}>3 คอลัมน์ · ลิงก์โซเชียล · Copyright</p>
             </div>
             <button style={saveBtn('footer')} onClick={() => saveSection('footer')} disabled={saving === 'footer'}>

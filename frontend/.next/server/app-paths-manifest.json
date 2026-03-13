@@ -1,4 +1,7 @@
 {
   "/page": "app/page.js",
-  "/admin/landing/page": "app/admin/landing/page.js"
+  "/admin/landing/page": "app/admin/landing/page.js",
+  "/admin/site/page": "app/admin/site/page.js",
+  "/admin/messages/send/page": "app/admin/messages/send/page.js",
+  "/admin/customers/page": "app/admin/customers/page.js"
 }
