@@ -79,20 +79,49 @@ export default function AccountTypesPage() {
 
   async function createRow() {
     const result = await Swal.fire({
-      title: 'Add Account Type',
+      title: 'เพิ่ม Account Type',
+      width: 760,
+      background: 'linear-gradient(180deg, #ffffff 0%, #fff9ef 100%)',
+      color: '#1f2a44',
+      showClass: { popup: 'swal2-show' },
       html: `
-        <div style="display:grid;gap:10px">
-          <input id="swal-account-code" class="swal2-input" placeholder="CODE (required)" style="margin:0" />
-          <input id="swal-account-label" class="swal2-input" placeholder="Label (required)" style="margin:0" />
-          <input id="swal-account-name" class="swal2-input" placeholder="Account Name (optional)" style="margin:0" />
-          <input id="swal-account-number" class="swal2-input" placeholder="Account Number (optional)" style="margin:0" />
-          <input id="swal-account-note" class="swal2-input" placeholder="Account Note (optional)" style="margin:0" />
-          <input id="swal-account-sort" class="swal2-input" type="number" value="0" placeholder="Sort" style="margin:0" />
+        <div style="text-align:left;border:1px solid #f2ddbd;border-radius:14px;background:#fff;padding:14px">
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px">
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              CODE <span style="color:#e51f2e">*</span>
+              <input id="swal-account-code" class="input" placeholder="เช่น KBANK" style="width:100%;margin-top:6px" />
+            </label>
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              Label <span style="color:#e51f2e">*</span>
+              <input id="swal-account-label" class="input" placeholder="เช่น KBank Main" style="width:100%;margin-top:6px" />
+            </label>
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              Account Name
+              <input id="swal-account-name" class="input" placeholder="Jawanda Cargo Co.,Ltd." style="width:100%;margin-top:6px" />
+            </label>
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              Account Number
+              <input id="swal-account-number" class="input" placeholder="123-456-7890" style="width:100%;margin-top:6px" />
+            </label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 120px;gap:10px 12px;margin-top:10px">
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              Account Note
+              <input id="swal-account-note" class="input" placeholder="ข้อความท้าย footer (ถ้ามี)" style="width:100%;margin-top:6px" />
+            </label>
+            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
+              Sort
+              <input id="swal-account-sort" class="input" type="number" value="0" placeholder="0" style="width:100%;margin-top:6px" />
+            </label>
+          </div>
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Add',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: 'บันทึก',
+      cancelButtonText: 'ยกเลิก',
+      confirmButtonColor: '#ff8a00',
+      cancelButtonColor: '#8a94a4',
+      reverseButtons: true,
       focusConfirm: false,
       preConfirm: () => {
         const codeEl = document.getElementById('swal-account-code') as HTMLInputElement | null;

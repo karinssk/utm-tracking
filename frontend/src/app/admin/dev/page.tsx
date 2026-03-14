@@ -12,6 +12,12 @@ interface Action {
 
 const ACTIONS: Action[] = [
   {
+    label: 'ลบ Orders + Reset Running Number',
+    description: 'ลบ orders ทั้งหมดและ reset เลขรันใหม่ (next = PO-YYMMDD-001)',
+    endpoint: '/api/dev/orders/reset-seq',
+    danger: true,
+  },
+  {
     label: 'ลบ Orders + Message Logs ทั้งหมด',
     description: 'ลบข้อมูล orders ทั้งหมดและ message logs ที่เกี่ยวข้อง (ไม่กระทบ customers)',
     endpoint: '/api/dev/orders',

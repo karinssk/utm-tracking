@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   UserIcon, PackageIcon, MailIcon, ChartIcon,
-  CheckIcon, ClockIcon, GlobeIcon,
+  CheckIcon, ClockIcon,
 } from './icons';
 
 interface Stats {
@@ -51,17 +51,11 @@ interface Message {
   picture_url: string | null;
 }
 
-interface UtmSource {
-  utm_source: string;
-  count: string;
-}
-
 interface DashboardData {
   stats: Stats;
   recentCustomers: Customer[];
   pendingOrders: Order[];
   recentMessages: Message[];
-  utmSources: UtmSource[];
 }
 
 const TEMPLATE_LABELS: Record<string, string> = {
@@ -157,9 +151,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { stats, recentCustomers, pendingOrders, recentMessages, utmSources } = data;
-
-  const maxUtm = Math.max(...utmSources.map((u) => Number(u.count)), 1);
+  const { stats, recentCustomers, pendingOrders, recentMessages } = data;
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -208,8 +200,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Row 2: Pending orders + UTM sources */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
+      {/* Row 2: Pending orders */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, alignItems: 'start' }}>
 
         {/* Pending orders */}
         <div style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
@@ -262,32 +254,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* UTM source breakdown */}
-        <div style={{ background: '#fff', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#2b3550', display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 16px' }}>
-            <GlobeIcon size={15} color="#0b57b7" /> แหล่งที่มา
-          </h2>
-          {utmSources.length === 0 ? (
-            <p className="page-subtitle" style={{ margin: 0 }}>ยังไม่มีข้อมูล</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {utmSources.map((u) => {
-                const pct = Math.round((Number(u.count) / maxUtm) * 100);
-                return (
-                  <div key={u.utm_source}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, color: '#2b3550', fontWeight: 600 }}>{u.utm_source}</span>
-                      <span style={{ fontSize: 12, color: '#8a94a4' }}>{Number(u.count).toLocaleString()}</span>
-                    </div>
-                    <div style={{ background: '#f0f4f8', borderRadius: 99, height: 6, overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: '#0b57b7', borderRadius: 99, transition: 'width 0.6s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Row 3: Recent customers + Recent messages */}

@@ -18,6 +18,18 @@ interface Order {
   created_at: string;
 }
 
+interface ExportFilters {
+  customer_code?: string;
+  date_from?: string;
+  date_to?: string;
+  status?: string;
+  template_type?: string;
+  stage?: string;
+  account_type?: string;
+  utm_source?: string;
+  utm_medium?: string;
+}
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   CONFIRMED: 'Confirmed',
@@ -100,15 +112,26 @@ export default function OrdersPage() {
 
   const totalPages = Math.ceil(total / 50);
 
-  const EXPORT_HEADERS = ['Order Code', 'Customer Code', 'Name', 'Type', 'Account Type', 'Amount', 'Exchange Rate', 'Currency', 'Total', 'Status', 'Stage', 'Seller Tracking', 'Delivery Tracking', 'Confirmed At', 'Created At'];
+  const EXPORT_HEADERS = ['Order Code', 'Customer Code', 'Name', 'Type', 'Account Type', 'Amount', 'Exchange Rate', 'Currency', 'Total', 'Status', 'Stage', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Seller Tracking', 'Delivery Tracking', 'Confirmed At', 'Created At'];
   const TEMPLATE_EXPORT_LABELS: Record<string, string> = { CONFIRM: 'คำสั่งซื้อสินค้า', IMPORT_INVOICE: 'ใบแจ้งหนี้นำเข้า', RECEIPT: 'ใบเสร็จรับเงิน' };
   const STATUS_EXPORT_LABELS: Record<string, string> = { PENDING: 'รอยืนยัน', CONFIRMED: 'ยืนยันแล้ว', UNCONFIRMED: 'ยกเลิก' };
 
-  function buildExportParams() {
+  function buildExportParams(filters?: ExportFilters) {
+    const f = filters || {};
     const params = new URLSearchParams();
-    if (customerCode) params.set('customer_code', customerCode);
-    if (date) params.set('date', date);
-    if (status) params.set('status', status);
+    if (f.customer_code) params.set('customer_code', f.customer_code);
+    if (f.date_from && f.date_to && f.date_from === f.date_to) {
+      params.set('date', f.date_from);
+    } else {
+      if (f.date_from) params.set('date_from', f.date_from);
+      if (f.date_to) params.set('date_to', f.date_to);
+    }
+    if (f.status) params.set('status', f.status);
+    if (f.template_type) params.set('template_type', f.template_type);
+    if (f.stage) params.set('stage', f.stage);
+    if (f.account_type) params.set('account_type', f.account_type);
+    if (f.utm_source) params.set('utm_source', f.utm_source);
+    if (f.utm_medium) params.set('utm_medium', f.utm_medium);
     return params;
   }
 
@@ -123,6 +146,9 @@ export default function OrdersPage() {
       o.total_amount != null ? Number(o.total_amount) : '',
       STATUS_EXPORT_LABELS[o.status as string] ?? o.status,
       o.stage,
+      o.utm_source ?? '',
+      o.utm_medium ?? '',
+      o.utm_campaign ?? '',
       o.seller_tracking_no ?? '',
       o.delivery_tracking_no ?? '',
       o.confirmed_at ? new Date(o.confirmed_at as string).toLocaleString('th-TH') : '',
@@ -130,31 +156,32 @@ export default function OrdersPage() {
     ];
   }
 
-  async function fetchExportData() {
-    const res = await fetch(`/api/orders/export?${buildExportParams()}`, { credentials: 'include' });
+  async function fetchExportData(filters?: ExportFilters) {
+    const res = await fetch(`/api/orders/export?${buildExportParams(filters)}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Export failed');
     const data = await res.json();
     return (data.orders || []) as Record<string, unknown>[];
   }
 
-  async function handleExportCSV() {
+  async function handleExportCSV(filters: ExportFilters) {
     try {
-      const rows = await fetchExportData();
+      const rows = await fetchExportData(filters);
       const lines = [EXPORT_HEADERS, ...rows.map(toRow)];
       const csv = lines.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `orders_${date || 'all'}.csv`; a.click();
+      const stamp = `${filters.date_from || 'all'}_${filters.date_to || 'all'}`;
+      a.href = url; a.download = `orders_${stamp}.csv`; a.click();
       URL.revokeObjectURL(url);
     } catch {
       Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Export failed', timer: 2500, showConfirmButton: false });
     }
   }
 
-  async function handleExportXLSX() {
+  async function handleExportXLSX(filters: ExportFilters) {
     try {
-      const rows = await fetchExportData();
+      const rows = await fetchExportData(filters);
       const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows.map(toRow)]);
       const colWidths = EXPORT_HEADERS.map((h, i) => {
         const max = Math.max(h.length, ...rows.map((r) => String(toRow(r)[i] ?? '').length));
@@ -163,9 +190,87 @@ export default function OrdersPage() {
       ws['!cols'] = colWidths;
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Orders');
-      XLSX.writeFile(wb, `orders_${date || 'all'}.xlsx`);
+      const stamp = `${filters.date_from || 'all'}_${filters.date_to || 'all'}`;
+      XLSX.writeFile(wb, `orders_${stamp}.xlsx`);
     } catch {
       Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Export failed', timer: 2500, showConfirmButton: false });
+    }
+  }
+
+  async function handleExportModal() {
+    const result = await Swal.fire({
+      title: 'Export Orders',
+      width: 760,
+      html: `
+        <div style="display:grid;gap:10px;text-align:left">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <input id="exp-customer-code" class="input" placeholder="Customer code" />
+            <input id="exp-date-from" class="input" type="date" />
+            <input id="exp-date-to" class="input" type="date" />
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <select id="exp-status" class="select">
+              <option value="">All status</option>
+              <option value="PENDING">Pending</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="UNCONFIRMED">Cancelled</option>
+            </select>
+            <select id="exp-template" class="select">
+              <option value="">All template</option>
+              <option value="CONFIRM">Purchase Order</option>
+              <option value="IMPORT_INVOICE">Import Invoice</option>
+              <option value="RECEIPT">Custom Message</option>
+            </select>
+            <input id="exp-stage" class="input" placeholder="Stage contains..." />
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <input id="exp-account-type" class="input" placeholder="Account type" />
+            <input id="exp-utm-source" class="input" placeholder="UTM Source" />
+            <input id="exp-utm-medium" class="input" placeholder="UTM Medium" />
+          </div>
+          <select id="exp-format" class="select">
+            <option value="xlsx">XLSX</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Export',
+      cancelButtonText: 'Cancel',
+      didOpen: () => {
+        const customerCodeEl = document.getElementById('exp-customer-code') as HTMLInputElement | null;
+        const dateFromEl = document.getElementById('exp-date-from') as HTMLInputElement | null;
+        const dateToEl = document.getElementById('exp-date-to') as HTMLInputElement | null;
+        const statusEl = document.getElementById('exp-status') as HTMLSelectElement | null;
+        const templateEl = document.getElementById('exp-template') as HTMLSelectElement | null;
+        if (customerCodeEl) customerCodeEl.value = customerCode;
+        if (dateFromEl) dateFromEl.value = date;
+        if (dateToEl) dateToEl.value = date;
+        if (statusEl) statusEl.value = status;
+        if (templateEl) templateEl.value = '';
+      },
+      preConfirm: () => {
+        const getVal = (id: string) => ((document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value || '').trim();
+        const filters: ExportFilters = {
+          customer_code: getVal('exp-customer-code') || undefined,
+          date_from: getVal('exp-date-from') || undefined,
+          date_to: getVal('exp-date-to') || undefined,
+          status: getVal('exp-status') || undefined,
+          template_type: getVal('exp-template') || undefined,
+          stage: getVal('exp-stage') || undefined,
+          account_type: getVal('exp-account-type') || undefined,
+          utm_source: getVal('exp-utm-source') || undefined,
+          utm_medium: getVal('exp-utm-medium') || undefined,
+        };
+        return { filters, format: getVal('exp-format') || 'xlsx' };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+    if (result.value.format === 'csv') {
+      await handleExportCSV(result.value.filters);
+    } else {
+      await handleExportXLSX(result.value.filters);
     }
   }
 
@@ -177,8 +282,7 @@ export default function OrdersPage() {
           <p className="page-subtitle">ติดตาม purchase order หลักและสถานะ workflow</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button type="button" className="btn btn-soft" onClick={handleExportCSV} style={{ fontSize: 13 }}>⬇ CSV</button>
-          <button type="button" className="btn btn-soft" onClick={handleExportXLSX} style={{ fontSize: 13 }}>⬇ XLSX</button>
+          <button type="button" className="btn btn-soft" onClick={handleExportModal} style={{ fontSize: 13 }}>Export</button>
         </div>
       </div>
 

@@ -63,6 +63,93 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/customers/export?customer_code=&display_name=&date_from=&date_to=&utm_source=&utm_medium=&utm_campaign=&is_blocked=&linked=
+router.get('/export', requireAuth, async (req, res) => {
+  try {
+    const {
+      customer_code,
+      display_name,
+      date_from,
+      date_to,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      is_blocked,
+      linked,
+    } = req.query;
+
+    const conditions = [];
+    const params = [];
+    let idx = 1;
+
+    if (customer_code) {
+      conditions.push(`c.customer_code ILIKE $${idx++}`);
+      params.push(`%${customer_code}%`);
+    }
+    if (display_name) {
+      conditions.push(`c.display_name ILIKE $${idx++}`);
+      params.push(`%${display_name}%`);
+    }
+    if (date_from) {
+      conditions.push(`DATE(c.created_at) >= $${idx++}`);
+      params.push(date_from);
+    }
+    if (date_to) {
+      conditions.push(`DATE(c.created_at) <= $${idx++}`);
+      params.push(date_to);
+    }
+    if (utm_source) {
+      conditions.push(`us.utm_source ILIKE $${idx++}`);
+      params.push(`%${utm_source}%`);
+    }
+    if (utm_medium) {
+      conditions.push(`us.utm_medium ILIKE $${idx++}`);
+      params.push(`%${utm_medium}%`);
+    }
+    if (utm_campaign) {
+      conditions.push(`us.utm_campaign ILIKE $${idx++}`);
+      params.push(`%${utm_campaign}%`);
+    }
+    if (is_blocked === 'true' || is_blocked === 'false') {
+      conditions.push(`c.is_blocked = $${idx++}`);
+      params.push(is_blocked === 'true');
+    }
+    if (linked === 'yes') {
+      conditions.push('us.linked_at IS NOT NULL');
+    } else if (linked === 'no') {
+      conditions.push('us.linked_at IS NULL');
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await pool.query(
+      `SELECT
+         c.id, c.customer_code, c.line_uid, c.display_name, c.picture_url,
+         c.source_type, c.is_blocked, c.created_at,
+         us.utm_source, us.utm_medium, us.utm_campaign, us.utm_content, us.utm_term,
+         us.follow_requested_at, us.linked_at
+       FROM customers c
+       LEFT JOIN LATERAL (
+         SELECT
+           s.utm_source, s.utm_medium, s.utm_campaign, s.utm_content, s.utm_term,
+           s.follow_requested_at, s.linked_at, s.created_at
+         FROM utm_sessions s
+         WHERE s.line_uid = c.line_uid
+         ORDER BY s.linked_at DESC NULLS LAST, s.created_at DESC
+         LIMIT 1
+       ) us ON TRUE
+       ${where}
+       ORDER BY c.created_at DESC`,
+      params,
+    );
+
+    res.json({ ok: true, customers: result.rows });
+  } catch (err) {
+    console.error('[customers/export]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/customers/search?q=
 router.get('/search', requireAuth, async (req, res) => {
   try {

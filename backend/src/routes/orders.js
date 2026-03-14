@@ -84,10 +84,21 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/orders/export?customer_code=&date=&status=&template_type=
+// GET /api/orders/export?customer_code=&date=&date_from=&date_to=&status=&template_type=&stage=&account_type=&utm_source=&utm_medium=
 router.get('/export', requireAuth, async (req, res) => {
   try {
-    const { customer_code, date, status, template_type } = req.query;
+    const {
+      customer_code,
+      date,
+      date_from,
+      date_to,
+      status,
+      template_type,
+      stage,
+      account_type,
+      utm_source,
+      utm_medium,
+    } = req.query;
 
     const conditions = [];
     const params = [];
@@ -101,6 +112,14 @@ router.get('/export', requireAuth, async (req, res) => {
       conditions.push(`DATE(o.created_at) = $${idx++}`);
       params.push(date);
     }
+    if (date_from) {
+      conditions.push(`DATE(o.created_at) >= $${idx++}`);
+      params.push(date_from);
+    }
+    if (date_to) {
+      conditions.push(`DATE(o.created_at) <= $${idx++}`);
+      params.push(date_to);
+    }
     if (status) {
       conditions.push(`o.status = $${idx++}`);
       params.push(status);
@@ -108,6 +127,22 @@ router.get('/export', requireAuth, async (req, res) => {
     if (template_type) {
       conditions.push(`o.template_type = $${idx++}`);
       params.push(template_type);
+    }
+    if (stage) {
+      conditions.push(`o.stage ILIKE $${idx++}`);
+      params.push(`%${stage}%`);
+    }
+    if (account_type) {
+      conditions.push(`o.account_type ILIKE $${idx++}`);
+      params.push(`%${account_type}%`);
+    }
+    if (utm_source) {
+      conditions.push(`utm.utm_source ILIKE $${idx++}`);
+      params.push(`%${utm_source}%`);
+    }
+    if (utm_medium) {
+      conditions.push(`utm.utm_medium ILIKE $${idx++}`);
+      params.push(`%${utm_medium}%`);
     }
 
     const where = conditions.length
@@ -120,9 +155,17 @@ router.get('/export', requireAuth, async (req, res) => {
               o.amount, o.exchange_rate, o.exchange_rate_currency,
               o.total_amount, o.status, o.stage,
               o.seller_tracking_no, o.delivery_tracking_no,
-              o.confirmed_at, o.created_at
+              o.confirmed_at, o.created_at,
+              utm.utm_source, utm.utm_medium, utm.utm_campaign
        FROM orders o
        LEFT JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN LATERAL (
+         SELECT us.utm_source, us.utm_medium, us.utm_campaign
+         FROM utm_sessions us
+         WHERE us.line_uid = c.line_uid
+         ORDER BY us.linked_at DESC NULLS LAST, us.created_at DESC
+         LIMIT 1
+       ) utm ON TRUE
        ${where}
        ORDER BY o.created_at DESC`,
       params,

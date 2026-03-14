@@ -3,6 +3,12 @@ import crypto from 'crypto';
 import { pool } from '../db.js';
 
 const router = Router();
+const DIRECT_OA_UTM = {
+  source: 'line_oa_direct',
+  medium: 'oa',
+  campaign: 'legacy_base',
+  sourceUrl: 'line://oa',
+};
 
 const WELCOME_MESSAGE = `ยินดีต้อนรับสู่ Jawanda Cargo! 🎉
 
@@ -81,6 +87,32 @@ async function upsertCustomer(lineUid, displayName = null, pictureUrl = null) {
   return result.rows[0].id;
 }
 
+async function ensureFallbackUtmSession(lineUid) {
+  if (!lineUid) return false;
+  const existing = await pool.query(
+    `SELECT 1
+     FROM utm_sessions
+     WHERE line_uid = $1
+     LIMIT 1`,
+    [lineUid],
+  );
+  if (existing.rowCount > 0) return false;
+
+  await pool.query(
+    `INSERT INTO utm_sessions
+       (utm_source, utm_medium, utm_campaign, source_url, line_uid, linked_at)
+     VALUES ($1,$2,$3,$4,$5,NOW())`,
+    [
+      DIRECT_OA_UTM.source,
+      DIRECT_OA_UTM.medium,
+      DIRECT_OA_UTM.campaign,
+      DIRECT_OA_UTM.sourceUrl,
+      lineUid,
+    ],
+  );
+  return true;
+}
+
 function parseInboundMessage(event) {
   if (!event?.message) return '';
   if (event.message.type === 'text') return event.message.text || '';
@@ -150,7 +182,7 @@ router.post('/', async (req, res) => {
 
         // Match the most recent UTM session where user clicked "Add LINE OA"
         // within the last 30 minutes and hasn't been linked yet
-        await pool.query(
+        const linked = await pool.query(
           `UPDATE utm_sessions
            SET line_uid = $1, linked_at = NOW()
            WHERE tracking_id = (
@@ -163,6 +195,9 @@ router.post('/', async (req, res) => {
            )`,
           [lineUid],
         );
+        if (linked.rowCount === 0) {
+          await ensureFallbackUtmSession(lineUid);
+        }
 
         let lineError = null;
         try {
@@ -192,6 +227,7 @@ router.post('/', async (req, res) => {
           profile?.displayName || lineUid,
           profile?.pictureUrl || null,
         );
+        await ensureFallbackUtmSession(lineUid);
         const inboundText = parseInboundMessage(event);
 
         await pool.query(

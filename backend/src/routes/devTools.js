@@ -16,6 +16,25 @@ router.delete('/orders', requireAuth, async (_req, res) => {
   }
 });
 
+// DELETE /api/dev/orders/reset-seq — clear orders and reset running number
+router.delete('/orders/reset-seq', requireAuth, async (_req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM message_logs WHERE order_id IS NOT NULL');
+    await client.query('DELETE FROM orders');
+    await client.query("ALTER SEQUENCE IF EXISTS order_seq RESTART WITH 1");
+    await client.query('COMMIT');
+    res.json({ ok: true, message: 'Orders cleared and running number reset (next order is ...-001)' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[dev/orders reset-seq]', err);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
 // DELETE /api/dev/messages — truncate message_logs only
 router.delete('/messages', requireAuth, async (_req, res) => {
   try {

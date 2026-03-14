@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
+import * as XLSX from 'xlsx';
 
 interface Customer {
   id: number;
@@ -15,6 +16,20 @@ interface Customer {
   utm_medium: string;
   utm_campaign: string;
   linked_at: string;
+  source_type?: string;
+  follow_requested_at?: string;
+}
+
+interface CustomerExportFilters {
+  customer_code?: string;
+  display_name?: string;
+  date_from?: string;
+  date_to?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  is_blocked?: string;
+  linked?: string;
 }
 
 export default function CustomersPage() {
@@ -87,10 +102,159 @@ export default function CustomersPage() {
     Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `บันทึกรหัส ${data.customer_code} สำเร็จ`, timer: 2000, showConfirmButton: false });
   }
 
+  const EXPORT_HEADERS = ['Customer Code', 'Name', 'LINE UID', 'Status', 'Source Type', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Follow Requested', 'Linked At', 'Created At'];
+  function toExportRow(c: Record<string, unknown>) {
+    return [
+      c.customer_code || '',
+      c.display_name || '',
+      c.line_uid || '',
+      c.is_blocked ? 'Blocked' : 'Active',
+      c.source_type || '',
+      c.utm_source || '',
+      c.utm_medium || '',
+      c.utm_campaign || '',
+      c.follow_requested_at ? new Date(String(c.follow_requested_at)).toLocaleString('th-TH') : '',
+      c.linked_at ? new Date(String(c.linked_at)).toLocaleString('th-TH') : '',
+      c.created_at ? new Date(String(c.created_at)).toLocaleString('th-TH') : '',
+    ];
+  }
+
+  function buildExportParams(filters: CustomerExportFilters) {
+    const params = new URLSearchParams();
+    if (filters.customer_code) params.set('customer_code', filters.customer_code);
+    if (filters.display_name) params.set('display_name', filters.display_name);
+    if (filters.date_from) params.set('date_from', filters.date_from);
+    if (filters.date_to) params.set('date_to', filters.date_to);
+    if (filters.utm_source) params.set('utm_source', filters.utm_source);
+    if (filters.utm_medium) params.set('utm_medium', filters.utm_medium);
+    if (filters.utm_campaign) params.set('utm_campaign', filters.utm_campaign);
+    if (filters.is_blocked) params.set('is_blocked', filters.is_blocked);
+    if (filters.linked) params.set('linked', filters.linked);
+    return params;
+  }
+
+  async function fetchExportData(filters: CustomerExportFilters) {
+    const res = await fetch(`/api/customers/export?${buildExportParams(filters)}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Export failed');
+    const data = await res.json();
+    return (data.customers || []) as Record<string, unknown>[];
+  }
+
+  async function exportCsv(filters: CustomerExportFilters) {
+    const rows = await fetchExportData(filters);
+    const lines = [EXPORT_HEADERS, ...rows.map(toExportRow)];
+    const csv = lines.map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = `${filters.date_from || 'all'}_${filters.date_to || 'all'}`;
+    a.href = url;
+    a.download = `customers_${stamp}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportXlsx(filters: CustomerExportFilters) {
+    const rows = await fetchExportData(filters);
+    const ws = XLSX.utils.aoa_to_sheet([EXPORT_HEADERS, ...rows.map(toExportRow)]);
+    ws['!cols'] = EXPORT_HEADERS.map((h, i) => {
+      const max = Math.max(h.length, ...rows.map((r) => String(toExportRow(r)[i] ?? '').length));
+      return { wch: Math.min(max + 2, 40) };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+    const stamp = `${filters.date_from || 'all'}_${filters.date_to || 'all'}`;
+    XLSX.writeFile(wb, `customers_${stamp}.xlsx`);
+  }
+
+  async function handleExportModal() {
+    const result = await Swal.fire({
+      title: 'Export Customers',
+      width: 760,
+      html: `
+        <div style="display:grid;gap:10px;text-align:left">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <input id="cx-code" class="input" placeholder="Customer code" />
+            <input id="cx-name" class="input" placeholder="Display name" />
+            <select id="cx-blocked" class="select">
+              <option value="">All status</option>
+              <option value="false">Active</option>
+              <option value="true">Blocked</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <input id="cx-date-from" class="input" type="date" />
+            <input id="cx-date-to" class="input" type="date" />
+            <select id="cx-linked" class="select">
+              <option value="">Linked: all</option>
+              <option value="yes">Linked only</option>
+              <option value="no">Unlinked only</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <input id="cx-utm-source" class="input" placeholder="UTM Source" />
+            <input id="cx-utm-medium" class="input" placeholder="UTM Medium" />
+            <input id="cx-utm-campaign" class="input" placeholder="UTM Campaign" />
+          </div>
+          <select id="cx-format" class="select">
+            <option value="xlsx">XLSX</option>
+            <option value="csv">CSV</option>
+          </select>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Export',
+      cancelButtonText: 'Cancel',
+      didOpen: () => {
+        const fromEl = document.getElementById('cx-date-from') as HTMLInputElement | null;
+        const toEl = document.getElementById('cx-date-to') as HTMLInputElement | null;
+        const sourceEl = document.getElementById('cx-utm-source') as HTMLInputElement | null;
+        if (fromEl) fromEl.value = date;
+        if (toEl) toEl.value = date;
+        if (sourceEl) sourceEl.value = utmSource;
+      },
+      preConfirm: () => {
+        const getVal = (id: string) => ((document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value || '').trim();
+        return {
+          filters: {
+            customer_code: getVal('cx-code') || undefined,
+            display_name: getVal('cx-name') || undefined,
+            date_from: getVal('cx-date-from') || undefined,
+            date_to: getVal('cx-date-to') || undefined,
+            utm_source: getVal('cx-utm-source') || undefined,
+            utm_medium: getVal('cx-utm-medium') || undefined,
+            utm_campaign: getVal('cx-utm-campaign') || undefined,
+            is_blocked: getVal('cx-blocked') || undefined,
+            linked: getVal('cx-linked') || undefined,
+          } as CustomerExportFilters,
+          format: getVal('cx-format') || 'xlsx',
+        };
+      },
+    });
+    if (!result.isConfirmed || !result.value) return;
+
+    try {
+      if (result.value.format === 'csv') {
+        await exportCsv(result.value.filters);
+      } else {
+        await exportXlsx(result.value.filters);
+      }
+    } catch {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Export failed', timer: 2500, showConfirmButton: false });
+    }
+  }
+
   return (
     <section>
-      <h1 className="page-title">ลูกค้า ({total.toLocaleString()})</h1>
-      <p className="page-subtitle">ติดตามสถานะลูกค้าและแหล่งที่มาของแคมเปญ</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+        <div>
+          <h1 className="page-title" style={{ margin: 0 }}>ลูกค้า ({total.toLocaleString()})</h1>
+          <p className="page-subtitle">ติดตามสถานะลูกค้าและข้อมูลแคมเปญ</p>
+        </div>
+        <div>
+          <button type="button" className="btn btn-soft" onClick={handleExportModal}>Export</button>
+        </div>
+      </div>
 
       <div className="filter-row">
         <input
