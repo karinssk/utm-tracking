@@ -169,11 +169,6 @@ function fmtBaht(value?: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} บาท`;
 }
 
-function fmtYuan(value?: number) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} หยวน`;
-}
-
 function pickColor(value: string | null | undefined, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value || '') ? String(value) : fallback;
 }
@@ -209,8 +204,6 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     receiptButtonUrl,
     accountType,
     amount,
-    exchangeRate,
-    exchangeRateCurrency,
     totalAmount,
     applyVat,
     applyWithholding,
@@ -220,10 +213,6 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     accountMeta,
   } = input;
 
-  const exchangeRateLabel = typeof exchangeRate === 'number'
-    ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
-    : '-';
-  const isImportInvoice = templateType === 'IMPORT_INVOICE';
   const isCustomMessage = templateType === 'RECEIPT';
   const headerTitle = isCustomMessage
     ? (customHeaderTitle?.trim() || 'Jawanda Cargo')
@@ -239,7 +228,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   const amountText = templateType === 'IMPORT_INVOICE'
     ? fmtBaht(amount)
     : templateType === 'CONFIRM'
-      ? fmtYuan(amount)
+      ? fmtBaht(amount)
       : fmtBaht(amount);
 
   type RowEntry = [string, string, boolean?]; // [label, value, isBankInfo?]
@@ -254,9 +243,8 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
       [template.detail_amount_label, amountText],
     );
   }
-  if (!isImportInvoice && !isCustomMessage) {
+  if (!isCustomMessage && templateType === 'CONFIRM') {
     rows.push(
-      [template.detail_exchange_rate_label, exchangeRateLabel],
       [template.detail_total_label, fmtBaht(totalAmount)],
     );
   }

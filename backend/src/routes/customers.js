@@ -108,7 +108,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         `SELECT id, order_code, template_type, account_type,
                 amount, exchange_rate, exchange_rate_currency, total_amount, status, stage,
                 expires_at, confirmed_at, created_at
-         FROM orders WHERE customer_id = $1 AND parent_order_id IS NULL
+         FROM orders WHERE customer_id = $1
          ORDER BY created_at DESC`,
         [id],
       ),

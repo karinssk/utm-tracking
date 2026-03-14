@@ -12,6 +12,7 @@ const SendSchema = z.object({
   templateType: z.enum(['IMPORT_INVOICE', 'CONFIRM', 'RECEIPT']),
   customMode: z.boolean().optional(),
   orderId: z.number().int().positive().optional(),
+  orderCode: z.string().trim().max(120).optional(),
   accountType: z.string().optional(),
   customHeaderTitle: z.string().trim().max(200).optional(),
   customHeaderSubtitle: z.string().trim().max(200).optional(),
@@ -121,7 +122,6 @@ const TEMPLATE_META = {
   },
 };
 
-const ORDER_SOURCE_TEMPLATE = 'CONFIRM';
 const STAGE_BY_TEMPLATE = {
   CONFIRM: 'WAITING_ORDER_CONFIRMATION',
   IMPORT_INVOICE: 'IMPORT_INVOICE_SENT',
@@ -163,11 +163,6 @@ async function pushLineMessage(lineUid, messages) {
 function fmtBaht(value) {
   if (typeof value !== 'number' || Number.isNaN(value)) return '-';
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} บาท`;
-}
-
-function fmtYuan(value) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} หยวน`;
 }
 
 function pickColor(value, fallback) {
@@ -222,10 +217,6 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
     },
   };
 
-  const exchangeRateLabel = typeof data.exchangeRate === 'number'
-    ? `${parseFloat(data.exchangeRate.toFixed(2))} ${(data.exchangeRateCurrency || 'CNY')}`.trim()
-    : '-';
-  const isImportInvoice = data.templateType === 'IMPORT_INVOICE';
   const isCustomMessage = data.templateType === 'RECEIPT';
   const headerTitle = isCustomMessage
     ? (data.customHeaderTitle || 'Jawanda Cargo')
@@ -242,7 +233,7 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
   const amountText = data.templateType === 'IMPORT_INVOICE'
     ? fmtBaht(data.amount)
     : data.templateType === 'CONFIRM'
-      ? fmtYuan(data.amount)
+      ? fmtBaht(data.amount)
       : fmtBaht(data.amount);
 
   const rows = [];
@@ -256,9 +247,8 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
       [meta.detailLabels.amount, amountText],
     );
   }
-  if (!isImportInvoice && !isCustomMessage) {
+  if (!isCustomMessage && data.templateType === 'CONFIRM') {
     rows.push(
-      [meta.detailLabels.exchangeRate, exchangeRateLabel],
       [meta.detailLabels.total, fmtBaht(data.totalAmount)],
     );
   }
@@ -459,11 +449,9 @@ router.post('/send', requireAuth, async (req, res) => {
   if (data.templateType === 'CONFIRM') {
     if (
       typeof data.amount !== 'number'
-      || typeof data.exchangeRate !== 'number'
-      || typeof data.totalAmount !== 'number'
     ) {
       return res.status(400).json({
-        error: 'CONFIRM requires amount, exchange rate, and total amount',
+        error: 'CONFIRM requires amount',
       });
     }
   }
@@ -529,7 +517,9 @@ router.post('/send', requireAuth, async (req, res) => {
       customerName: custResult.rows[0].display_name || undefined,
     };
 
-    if (data.templateType === ORDER_SOURCE_TEMPLATE) {
+    const providedOrderCode = (data.orderCode || '').trim();
+    if (data.templateType === 'CONFIRM') {
+      const resolvedOrderCode = providedOrderCode || await generateOrderCode(client, data.templateType);
       const orderResult = await client.query(
         `INSERT INTO orders
            (order_code, customer_id, parent_order_id, template_type, account_type,
@@ -537,65 +527,36 @@ router.post('/send', requireAuth, async (req, res) => {
          VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'PENDING',$9, NOW() + INTERVAL '24 hours')
          RETURNING id, order_code`,
         [
-          await generateOrderCode(client, data.templateType),
+          resolvedOrderCode,
           data.customerId,
-          ORDER_SOURCE_TEMPLATE,
+          data.templateType,
           data.accountType,
           data.amount,
-          data.exchangeRate,
-          data.exchangeRateCurrency || 'CNY',
-          data.netTotal ?? data.totalAmount,
+          null,
+          null,
+          data.netTotal ?? data.totalAmount ?? data.amount,
           STAGE_BY_TEMPLATE[data.templateType],
         ],
       );
       orderId = orderResult.rows[0].id;
       orderCode = orderResult.rows[0].order_code;
     } else if (data.templateType === 'IMPORT_INVOICE') {
-      if (!data.orderId) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'orderId is required for this document type' });
-      }
-
-      const orderResult = await client.query(
-        `SELECT id, order_code, customer_id, parent_order_id, template_type, account_type,
-                amount, exchange_rate, exchange_rate_currency, total_amount, status, stage
-         FROM orders
-         WHERE id = $1 AND customer_id = $2
-         LIMIT 1`,
-        [data.orderId, data.customerId],
-      );
-
-      if (orderResult.rowCount === 0) {
-        await client.query('ROLLBACK');
-        return res.status(404).json({ error: 'Order not found for this customer' });
-      }
-
-      const order = orderResult.rows[0];
-      if (order.template_type !== ORDER_SOURCE_TEMPLATE || order.parent_order_id != null) {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Only purchase orders can be used as the source document' });
-      }
-      if (order.status !== 'CONFIRMED') {
-        await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Order must be confirmed before sending this document' });
-      }
-
+      const manualOrderCode = providedOrderCode || '-';
       const documentResult = await client.query(
         `INSERT INTO orders
            (order_code, customer_id, parent_order_id, template_type, account_type,
             amount, exchange_rate, exchange_rate_currency, total_amount, status, stage, confirmed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'SENT',$10,NOW())
+         VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,'SENT',$9,NOW())
          RETURNING id, order_code`,
         [
-          await generateOrderCode(client, data.templateType),
+          manualOrderCode,
           data.customerId,
-          order.id,
           data.templateType,
           data.accountType,
           data.amount,
           data.exchangeRate,
           data.exchangeRateCurrency || 'CNY',
-          data.netTotal ?? data.totalAmount,
+          data.netTotal ?? data.totalAmount ?? data.amount,
           STAGE_BY_TEMPLATE[data.templateType],
         ],
       );
@@ -607,28 +568,9 @@ router.post('/send', requireAuth, async (req, res) => {
         customerCode: custResult.rows[0].customer_code || undefined,
         customerName: custResult.rows[0].display_name || undefined,
       };
-
-      if (data.accountType) {
-        const existingAccount = await client.query(
-          `SELECT code, label, account_name, account_number
-           FROM account_types
-           WHERE code = $1 AND is_active = TRUE`,
-          [data.accountType],
-        );
-        accountMeta = existingAccount.rowCount > 0 ? existingAccount.rows[0] : null;
-      } else {
-        accountMeta = null;
-      }
-
-      await client.query(
-        `UPDATE orders
-         SET stage = $2
-         WHERE id = $1`,
-        [order.id, STAGE_BY_TEMPLATE[data.templateType]],
-      );
     } else {
       orderId = null;
-      orderCode = await generateOrderCode(client, data.templateType);
+      orderCode = providedOrderCode || await generateOrderCode(client, data.templateType);
       payloadForMessage = {
         ...data,
         customerCode: custResult.rows[0].customer_code || undefined,

@@ -55,7 +55,7 @@ router.get('/', requireAuth, async (req, res) => {
       SELECT o.*, c.customer_code, c.display_name
       FROM orders o
       LEFT JOIN customers c ON c.id = o.customer_id
-      ${where ? `${where} AND o.parent_order_id IS NULL` : 'WHERE o.parent_order_id IS NULL'}
+      ${where}
       ORDER BY o.created_at DESC
       LIMIT $${idx++} OFFSET $${idx++}
     `;
@@ -64,7 +64,7 @@ router.get('/', requireAuth, async (req, res) => {
     const countSql = `
       SELECT COUNT(*) FROM orders o
       LEFT JOIN customers c ON c.id = o.customer_id
-      ${where ? `${where} AND o.parent_order_id IS NULL` : 'WHERE o.parent_order_id IS NULL'}
+      ${where}
     `;
 
     const [data, count] = await Promise.all([
@@ -111,8 +111,8 @@ router.get('/export', requireAuth, async (req, res) => {
     }
 
     const where = conditions.length
-      ? `WHERE ${conditions.join(' AND ')} AND o.parent_order_id IS NULL`
-      : 'WHERE o.parent_order_id IS NULL';
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
 
     const result = await pool.query(
       `SELECT o.order_code, c.customer_code, c.display_name,
@@ -141,38 +141,28 @@ router.get('/:id', requireAuth, async (req, res) => {
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid id' });
 
   try {
-    const [orderRes, messagesRes, documentsRes] = await Promise.all([
+    const [orderRes, messagesRes] = await Promise.all([
       pool.query(
         `SELECT o.*,
                 c.id AS customer_id, c.customer_code, c.display_name,
                 c.picture_url, c.line_uid, c.is_blocked
          FROM orders o
          LEFT JOIN customers c ON c.id = o.customer_id
-         WHERE o.id = $1 AND o.parent_order_id IS NULL`,
+         WHERE o.id = $1`,
         [id],
       ),
       pool.query(
         `SELECT id, order_id, template_type, message_text, line_error, sent_at
          FROM message_logs
          WHERE order_id = $1
-            OR order_id IN (SELECT id FROM orders WHERE parent_order_id = $1)
          ORDER BY sent_at ASC`,
-        [id],
-      ),
-      pool.query(
-        `SELECT id, order_code, template_type, account_type, amount, exchange_rate,
-                exchange_rate_currency, total_amount, status, stage,
-                created_at, confirmed_at
-         FROM orders
-         WHERE parent_order_id = $1
-         ORDER BY created_at ASC`,
         [id],
       ),
     ]);
 
     if (orderRes.rowCount === 0) return res.status(404).json({ error: 'Not found' });
 
-    res.json({ order: orderRes.rows[0], messages: messagesRes.rows, documents: documentsRes.rows });
+    res.json({ order: orderRes.rows[0], messages: messagesRes.rows, documents: [] });
   } catch (err) {
     console.error('[orders/:id]', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -192,7 +182,7 @@ router.post('/:id/confirm', requireAuth, async (req, res) => {
        SET status = 'CONFIRMED',
            stage = 'ORDER_CONFIRMED',
            confirmed_at = NOW()
-       WHERE id = $1 AND status = 'PENDING' AND parent_order_id IS NULL
+       WHERE id = $1 AND status = 'PENDING'
        RETURNING id, status, stage, confirmed_at`,
       [id],
     );
@@ -215,7 +205,7 @@ router.post('/:id/cancel', requireAuth, async (req, res) => {
     const result = await pool.query(
       `UPDATE orders
        SET status = 'UNCONFIRMED'
-       WHERE id = $1 AND status = 'PENDING' AND parent_order_id IS NULL
+       WHERE id = $1 AND status = 'PENDING'
        RETURNING id, status`,
       [id],
     );
@@ -252,7 +242,7 @@ router.post('/:id/lifecycle', requireAuth, async (req, res) => {
            delivery_tracking_no = NULLIF($7, ''),
            delivery_note = NULLIF($8, ''),
            delivery_updated_at = NOW()
-       WHERE id = $1 AND parent_order_id IS NULL
+       WHERE id = $1
        RETURNING id, stage, seller_tracking_no, thai_warehouse_received_at,
                  delivery_method, delivery_provider, delivery_tracking_no, delivery_note, delivery_updated_at`,
       [

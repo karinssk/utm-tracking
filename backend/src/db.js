@@ -175,6 +175,10 @@ export async function initDb() {
       ADD COLUMN IF NOT EXISTS header_text_color TEXT NOT NULL DEFAULT '#ffffff';
     `);
     await client.query(`
+      ALTER TABLE orders
+      DROP CONSTRAINT IF EXISTS orders_order_code_key;
+    `);
+    await client.query(`
       ALTER TABLE template_configs
       ADD COLUMN IF NOT EXISTS body_label_color TEXT NOT NULL DEFAULT '#6b7280';
     `);

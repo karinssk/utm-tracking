@@ -43,21 +43,6 @@ interface MessageLog {
   sent_at: string;
 }
 
-interface RelatedDocument {
-  id: number;
-  order_code: string;
-  template_type: string;
-  account_type: string | null;
-  amount: number | null;
-  exchange_rate: number | null;
-  exchange_rate_currency: string | null;
-  total_amount: number | null;
-  status: string;
-  stage: string;
-  created_at: string;
-  confirmed_at: string | null;
-}
-
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอยืนยัน',
   CONFIRMED: 'ยืนยันแล้ว',
@@ -106,7 +91,6 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<MessageLog[]>([]);
-  const [documents, setDocuments] = useState<RelatedDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
 
@@ -116,7 +100,6 @@ export default function OrderDetailPage() {
       .then((data) => {
         setOrder(data.order);
         setMessages(data.messages || []);
-        setDocuments(data.documents || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -193,7 +176,6 @@ export default function OrderDetailPage() {
             <Row label="ประเภทบัญชี" value={order.account_type} />
             <Row label="Workflow" value={STAGE_LABELS[order.stage] ?? order.stage} />
             <Row label="จำนวนเงิน" value={n(order.amount)} />
-            <Row label="อัตราแลกเปลี่ยน" value={order.exchange_rate != null ? String(order.exchange_rate) : null} />
             <Row label="ยอดสุทธิ" value={n(order.total_amount)} />
             <Row label="เลขพัสดุผู้ขาย" value={order.seller_tracking_no} />
             <Row label="เข้าโกดังไทย" value={order.thai_warehouse_received_at ? fmt(order.thai_warehouse_received_at) : null} />
@@ -256,32 +238,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          <div style={{ background: '#fff', borderRadius: 16, padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#2b3550', marginBottom: 14 }}>เอกสารที่อ้างอิง order นี้</h2>
-            {documents.length === 0 ? (
-              <p className="page-subtitle">ยังไม่มีใบแจ้งหนี้นำเข้าหรือใบเสร็จ</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 10 }}>
-                {documents.map((doc) => (
-                  <div key={doc.id} style={{ border: '1px solid #edf2f7', borderRadius: 12, padding: 12, background: '#fbfdff' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, color: '#0f172a' }}>{doc.order_code}</div>
-                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{TEMPLATE_LABELS[doc.template_type] ?? doc.template_type}</div>
-                      </div>
-                      <span className="badge badge-success">{doc.status}</span>
-                    </div>
-                    <div style={{ marginTop: 10, display: 'grid', gap: 6, fontSize: 13, color: '#475569' }}>
-                      <div>จำนวนเงิน: {n(doc.amount)}</div>
-                      <div>อัตราแลกเปลี่ยน: {doc.exchange_rate != null ? `${doc.exchange_rate} ${doc.exchange_rate_currency || 'CNY'}` : '-'}</div>
-                      <div>ยอดสุทธิ: {n(doc.total_amount)}</div>
-                      <div>ส่งเมื่อ: {fmt(doc.created_at)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right column — messages sent for this order */}

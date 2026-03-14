@@ -23,22 +23,6 @@ interface AccountTypeOption {
   sort_order: number;
 }
 
-interface OrderOption {
-  id: number;
-  order_code: string;
-  template_type: string;
-  account_type: string | null;
-  amount: number | null;
-  exchange_rate: number | null;
-  exchange_rate_currency: 'USD' | 'CNY' | 'THB' | null;
-  total_amount: number | null;
-  status: 'PENDING' | 'CONFIRMED' | 'UNCONFIRMED';
-  stage: string;
-  expires_at: string | null;
-  confirmed_at: string | null;
-  created_at: string;
-}
-
 const TEMPLATE_TYPES = [
   { value: 'CONFIRM', label: 'คำสั่งซื้อสินค้า (Purchase Order)', accent: '#2e7d32', footer: 'กรุณาตรวจสอบรายละเอียดและยืนยันคำสั่งซื้อ' },
   { value: 'IMPORT_INVOICE', label: 'ใบแจ้งหนี้นำเข้า (Import Invoice)', accent: '#1565c0', footer: 'กรุณาชำระค่าใช้จ่ายนำเข้าตามบิลนี้' },
@@ -70,12 +54,6 @@ function extractApiError(payload: unknown): string {
   return 'Request failed';
 }
 
-function statusLabel(status: OrderOption['status']) {
-  if (status === 'CONFIRMED') return 'ยืนยันแล้ว';
-  if (status === 'UNCONFIRMED') return 'ยกเลิก / หมดอายุ';
-  return 'รอยืนยัน';
-}
-
 export default function SendMessagePage() {
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<Customer[]>([]);
@@ -85,10 +63,7 @@ export default function SendMessagePage() {
   const [accountType, setAccountType] = useState('');
   const [accountTypes, setAccountTypes] = useState<AccountTypeOption[]>([]);
   const [templateConfigs, setTemplateConfigs] = useState<TemplatePreviewConfig[]>([]);
-  const [customerOrders, setCustomerOrders] = useState<OrderOption[]>([]);
-  const [selectedOrderId, setSelectedOrderId] = useState('');
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  const [orderCode, setOrderCode] = useState('');
   const [customHeaderTitle, setCustomHeaderTitle] = useState(CUSTOM_HEADER_TITLE_DEFAULT);
   const [customHeaderSubtitle, setCustomHeaderSubtitle] = useState(CUSTOM_HEADER_SUBTITLE_DEFAULT);
   const [bodyIntroText, setBodyIntroText] = useState('');
@@ -146,61 +121,24 @@ export default function SendMessagePage() {
   }, [search, selectedCustomer]);
 
   useEffect(() => {
-    if (!selectedCustomer) {
-      setCustomerOrders([]);
-      setSelectedOrderId('');
+    if (templateType === 'CONFIRM') {
+      setOrderCode('');
       return;
     }
-
-    setLoadingOrders(true);
-    fetch(`/api/customers/${selectedCustomer.id}`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((data) => {
-        setCustomerOrders(data.orders || []);
-      })
-      .catch(() => setCustomerOrders([]))
-      .finally(() => setLoadingOrders(false));
-  }, [selectedCustomer]);
-
-  const needsExistingOrder = templateType === 'IMPORT_INVOICE';
-  const eligibleOrders = useMemo(
-    () => customerOrders.filter((order) => order.template_type === 'CONFIRM' && order.status === 'CONFIRMED'),
-    [customerOrders],
-  );
-
-  useEffect(() => {
-    if (!needsExistingOrder) {
-      setSelectedOrderId('');
+    if (templateType === 'IMPORT_INVOICE') {
+      setOrderCode('-');
       return;
     }
+    setOrderCode('');
+  }, [templateType]);
 
-    if (!selectedOrderId || !eligibleOrders.some((order) => String(order.id) === selectedOrderId)) {
-      setSelectedOrderId(eligibleOrders[0] ? String(eligibleOrders[0].id) : '');
+  const autoBaseAmount = useMemo(() => {
+    if (templateType === 'IMPORT_INVOICE') {
+      const rate = exchangeRate.trim() ? toNum(exchangeRate) : 1;
+      return toNum(amount) * rate;
     }
-  }, [needsExistingOrder, eligibleOrders, selectedOrderId]);
-
-  const selectedOrder = useMemo(
-    () => eligibleOrders.find((order) => String(order.id) === selectedOrderId) || null,
-    [eligibleOrders, selectedOrderId],
-  );
-
-  useEffect(() => {
-    if (!selectedOrder) return;
-    if (!accountType && selectedOrder.account_type) {
-      setAccountType(selectedOrder.account_type);
-    }
-    if (!amount && selectedOrder.amount != null) {
-      setAmount(String(selectedOrder.amount));
-    }
-    if (!exchangeRate && selectedOrder.exchange_rate != null) {
-      setExchangeRate(String(parseFloat(Number(selectedOrder.exchange_rate).toFixed(2))));
-    }
-    if (selectedOrder.exchange_rate_currency) {
-      setExchangeRateCurrency(selectedOrder.exchange_rate_currency);
-    }
-  }, [selectedOrder, accountType, amount, exchangeRate]);
-
-  const autoBaseAmount = useMemo(() => toNum(amount) * toNum(exchangeRate), [amount, exchangeRate]);
+    return toNum(amount);
+  }, [templateType, amount, exchangeRate]);
 
   const summary = useMemo(() => {
     const base = autoBaseAmount;
@@ -257,17 +195,17 @@ export default function SendMessagePage() {
     };
   }, []);
 
-  const previewOrderCode = templateType === 'CONFIRM'
-    ? 'PO-YYMMDD-001'
-    : templateType === 'IMPORT_INVOICE'
-      ? 'IMP-INV-YYMMDD-001'
+  const previewOrderCode = templateType === 'IMPORT_INVOICE'
+    ? (orderCode.trim() || '-')
+    : templateType === 'CONFIRM'
+      ? (orderCode.trim() || 'PO-YYMMDD-001')
       : 'RCPT-YYMMDD-001';
   const previewFlexJson = JSON.stringify(
     buildPreviewFlexMessage({
       template: selectedTemplateConfig,
       templateType,
       orderCode: previewOrderCode,
-      orderId: selectedOrder?.id || 999,
+      orderId: 999,
       customerCode: selectedCustomer?.customer_code || 'JWD/000001',
       customHeaderTitle: templateType === 'RECEIPT' ? customHeaderTitle : undefined,
       customHeaderSubtitle: templateType === 'RECEIPT' ? customHeaderSubtitle : undefined,
@@ -279,8 +217,8 @@ export default function SendMessagePage() {
       receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
       accountType: accountType || undefined,
       amount: toNum(amount),
-      exchangeRate: toNum(exchangeRate) || undefined,
-      exchangeRateCurrency,
+      exchangeRate: templateType === 'IMPORT_INVOICE' ? (toNum(exchangeRate) || undefined) : undefined,
+      exchangeRateCurrency: templateType === 'IMPORT_INVOICE' ? exchangeRateCurrency : undefined,
       totalAmount: summary.base,
       applyVat,
       applyWithholding,
@@ -343,10 +281,6 @@ export default function SendMessagePage() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCustomer) return;
-    if (needsExistingOrder && !selectedOrder) {
-      await Swal.fire({ icon: 'warning', title: 'ยังไม่ได้เลือกคำสั่งซื้อ', text: 'กรุณาเลือกคำสั่งซื้อที่ยืนยันแล้วก่อนส่งเอกสารนี้' });
-      return;
-    }
 
     const templateLabel = TEMPLATE_TYPES.find((t) => t.value === templateType)?.label ?? templateType;
     const confirmed = await Swal.fire({
@@ -355,8 +289,7 @@ export default function SendMessagePage() {
         <div style="text-align:left;font-size:14px;line-height:2">
           <div><b>ลูกค้า:</b> ${selectedCustomer.customer_code} — ${selectedCustomer.display_name}</div>
           <div><b>Template:</b> ${templateLabel}</div>
-          ${selectedOrder ? `<div><b>Order Ref ID:</b> #${selectedOrder.id}</div>` : ''}
-          ${selectedOrder ? `<div><b>อ้างอิง Order:</b> ${selectedOrder.order_code}</div>` : ''}
+          ${templateType !== 'RECEIPT' ? `<div><b>เลขคำสั่งซื้อ:</b> ${previewOrderCode}</div>` : ''}
           ${bodyIntroText ? `<div><b>Custom Body:</b> ${bodyIntroText.replace(/\n/g, '<br/>')}</div>` : ''}
           ${footerNote ? `<div><b>Custom Footer:</b> ${footerNote.replace(/\n/g, '<br/>')}</div>` : ''}
           ${templateType !== 'RECEIPT' && summary.netTotal ? `<div><b>ยอดสุทธิ:</b> ${money(summary.netTotal)}</div>` : ''}
@@ -383,7 +316,7 @@ export default function SendMessagePage() {
           customerId: selectedCustomer.id,
           templateType,
           customMode: templateType === 'RECEIPT',
-          orderId: selectedOrder ? selectedOrder.id : undefined,
+          orderCode: templateType === 'IMPORT_INVOICE' ? (orderCode.trim() || '-') : (orderCode.trim() || undefined),
           accountType: accountType || undefined,
           customHeaderTitle: templateType === 'RECEIPT' ? (customHeaderTitle || undefined) : undefined,
           customHeaderSubtitle: templateType === 'RECEIPT' ? (customHeaderSubtitle || undefined) : undefined,
@@ -394,8 +327,8 @@ export default function SendMessagePage() {
           receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
           receiptButtonUrl: templateType === 'RECEIPT' ? (receiptButtonUrl || undefined) : undefined,
           amount: amount ? Number(amount) : undefined,
-          exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
-          exchangeRateCurrency,
+          exchangeRate: templateType === 'IMPORT_INVOICE' && exchangeRate ? Number(exchangeRate) : undefined,
+          exchangeRateCurrency: templateType === 'IMPORT_INVOICE' ? exchangeRateCurrency : undefined,
           totalAmount: summary.base || undefined,
           applyVat,
           applyWithholding,
@@ -414,7 +347,7 @@ export default function SendMessagePage() {
       Swal.fire({
         icon: 'success',
         title: 'ส่งสำเร็จ!',
-        text: data.orderId ? `Order Ref #${data.orderId} • ${data.orderCode}` : `Order: ${data.orderCode}`,
+        text: data.orderId ? `Order #${data.orderId} • ${data.orderCode}` : `Order: ${data.orderCode}`,
         timer: 2200,
         showConfirmButton: false,
       });
@@ -674,48 +607,17 @@ export default function SendMessagePage() {
               placeholder={'บันทึกเพิ่มเติม / Thank You'}
             />
 
-            {needsExistingOrder && (
+            {templateType !== 'RECEIPT' && (
               <>
-                <label className="field-label">Order อ้างอิง *</label>
-                <select
-                  className="select"
+                <label className="field-label">เลขคำสั่งซื้อ</label>
+                <input
+                  className="input"
                   style={{ width: '100%' }}
-                  value={selectedOrderId}
-                  onChange={(e) => setSelectedOrderId(e.target.value)}
-                  disabled={!selectedCustomer || loadingOrders || eligibleOrders.length === 0}
-                >
-                  <option value="">
-                    {loadingOrders ? 'กำลังโหลด order...' : eligibleOrders.length === 0 ? 'ไม่มี order ที่ยืนยันแล้ว' : '-- Select Order --'}
-                  </option>
-                  {eligibleOrders.map((order) => (
-                    <option key={order.id} value={order.id}>
-                      #{order.id} • {order.order_code} • {statusLabel(order.status)}
-                    </option>
-                  ))}
-                </select>
-
-                {selectedOrder && (
-                  <div style={{ marginTop: 8, borderRadius: 10, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowOrderDetail((v) => !v)}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f7f8fb', border: 0, padding: '8px 12px', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: '#0f172a' }}
-                    >
-                      <span>{selectedOrder.order_code} <span style={{ fontWeight: 400, color: '#8a94a4', fontSize: 12 }}>#{selectedOrder.id}</span></span>
-                      <span style={{ fontSize: 11, color: '#8a94a4' }}>{showOrderDetail ? '▲ ซ่อน' : '▼ รายละเอียด'}</span>
-                    </button>
-                    {showOrderDetail && (
-                      <div style={{ padding: '10px 12px', display: 'grid', gap: 5, fontSize: 13, color: '#475569' }}>
-                        <div>สถานะ: {statusLabel(selectedOrder.status)}</div>
-                        <div>Stage: {selectedOrder.stage}</div>
-                        <div>ประเภทบัญชี: {selectedOrder.account_type || '-'}</div>
-                        <div>จำนวนเงิน: {money(Number(selectedOrder.amount || 0))}</div>
-                        <div>อัตราแลกเปลี่ยน: {selectedOrder.exchange_rate != null ? `${parseFloat(Number(selectedOrder.exchange_rate).toFixed(2))} ${selectedOrder.exchange_rate_currency || 'CNY'}` : '-'}</div>
-                        <div>ยอดสุทธิ: {money(Number(selectedOrder.total_amount || 0))}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  type="text"
+                  value={orderCode}
+                  onChange={(e) => setOrderCode(e.target.value)}
+                  placeholder={templateType === 'CONFIRM' ? 'ปล่อยว่างเพื่อให้ระบบ generate อัตโนมัติ' : '-'}
+                />
               </>
             )}
 
@@ -739,20 +641,24 @@ export default function SendMessagePage() {
                 <label className="field-label">Amount</label>
                 <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
 
-                <label className="field-label">Exchange Rate</label>
-                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
-                  <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
-                  <select
-                    className="select"
-                    style={{ width: '100%' }}
-                    value={exchangeRateCurrency}
-                    onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
-                  >
-                    <option value="CNY">CNY</option>
-                    <option value="USD">USD</option>
-                    <option value="THB">THB</option>
-                  </select>
-                </div>
+                {templateType === 'IMPORT_INVOICE' && (
+                  <>
+                    <label className="field-label">Exchange Rate</label>
+                    <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>
+                      <input className="input" style={{ width: '100%' }} type="number" value={exchangeRate} onChange={(e) => setExchangeRate(e.target.value)} step="0.000001" />
+                      <select
+                        className="select"
+                        style={{ width: '100%' }}
+                        value={exchangeRateCurrency}
+                        onChange={(e) => setExchangeRateCurrency(e.target.value as 'USD' | 'CNY' | 'THB')}
+                      >
+                        <option value="CNY">CNY</option>
+                        <option value="USD">USD</option>
+                        <option value="THB">THB</option>
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <label className="field-label">Total (ฐานคำนวณ)</label>
                 <input
@@ -787,7 +693,7 @@ export default function SendMessagePage() {
             <button
               className="btn btn-primary"
               type="submit"
-              disabled={!selectedCustomer || sending || (needsExistingOrder && !selectedOrder)}
+              disabled={!selectedCustomer || sending}
               style={{ marginTop: 16, width: '100%' }}
             >
               {sending ? 'Sending...' : 'ส่ง Flex Message'}
@@ -797,7 +703,6 @@ export default function SendMessagePage() {
 
         <aside className="table-shell" style={{ padding: 14, position: 'sticky', top: 12 }}>
           <p style={{ fontWeight: 800, color: '#0b57b7', marginBottom: 10 }}>Flex Preview</p>
-          {selectedOrder && <p className="info-note" style={{ marginTop: 0, marginBottom: 10 }}>Order Ref #{selectedOrder.id}</p>}
           <FlexPreview json={previewFlexJson} />
         </aside>
       </div>
