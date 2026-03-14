@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Swal from 'sweetalert2';
 
 interface AccountType {
   id: number;
@@ -18,12 +19,6 @@ export default function AccountTypesPage() {
   const [rows, setRows] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | 'new' | null>(null);
-  const [newCode, setNewCode] = useState('');
-  const [newLabel, setNewLabel] = useState('');
-  const [newAccountName, setNewAccountName] = useState('');
-  const [newAccountNumber, setNewAccountNumber] = useState('');
-  const [newAccountNote, setNewAccountNote] = useState('');
-  const [newSort, setNewSort] = useState('0');
 
   async function load() {
     setLoading(true);
@@ -40,6 +35,18 @@ export default function AccountTypesPage() {
 
   function patch(id: number, patchValue: Partial<AccountType>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patchValue } : r)));
+  }
+
+  function toast(icon: 'success' | 'error', title: string) {
+    return Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon,
+      title,
+      showConfirmButton: false,
+      timer: 2200,
+      timerProgressBar: true,
+    });
   }
 
   async function save(row: AccountType) {
@@ -60,17 +67,61 @@ export default function AccountTypesPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || 'Save failed');
+        await Swal.fire({ icon: 'error', title: 'Save failed', text: data.error || 'Save failed' });
         return;
       }
       patch(row.id, data.accountType);
+      await toast('success', `Saved ${data.accountType?.code || row.code}`);
     } finally {
       setSavingId(null);
     }
   }
 
   async function createRow() {
-    if (!newCode.trim() || !newLabel.trim()) return;
+    const result = await Swal.fire({
+      title: 'Add Account Type',
+      html: `
+        <div style="display:grid;gap:10px">
+          <input id="swal-account-code" class="swal2-input" placeholder="CODE (required)" style="margin:0" />
+          <input id="swal-account-label" class="swal2-input" placeholder="Label (required)" style="margin:0" />
+          <input id="swal-account-name" class="swal2-input" placeholder="Account Name (optional)" style="margin:0" />
+          <input id="swal-account-number" class="swal2-input" placeholder="Account Number (optional)" style="margin:0" />
+          <input id="swal-account-note" class="swal2-input" placeholder="Account Note (optional)" style="margin:0" />
+          <input id="swal-account-sort" class="swal2-input" type="number" value="0" placeholder="Sort" style="margin:0" />
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: 'Add',
+      cancelButtonText: 'Cancel',
+      focusConfirm: false,
+      preConfirm: () => {
+        const codeEl = document.getElementById('swal-account-code') as HTMLInputElement | null;
+        const labelEl = document.getElementById('swal-account-label') as HTMLInputElement | null;
+        const nameEl = document.getElementById('swal-account-name') as HTMLInputElement | null;
+        const numberEl = document.getElementById('swal-account-number') as HTMLInputElement | null;
+        const noteEl = document.getElementById('swal-account-note') as HTMLInputElement | null;
+        const sortEl = document.getElementById('swal-account-sort') as HTMLInputElement | null;
+
+        const code = (codeEl?.value || '').trim().toUpperCase();
+        const label = (labelEl?.value || '').trim();
+        if (!code || !label) {
+          Swal.showValidationMessage('CODE and Label are required');
+          return false;
+        }
+
+        return {
+          code,
+          label,
+          account_name: (nameEl?.value || '').trim() || null,
+          account_number: (numberEl?.value || '').trim() || null,
+          account_note: (noteEl?.value || '').trim() || null,
+          sort_order: Number(sortEl?.value || 0) || 0,
+        };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
     setSavingId('new');
     try {
       const res = await fetch('/api/account-types', {
@@ -78,27 +129,17 @@ export default function AccountTypesPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          code: newCode.trim().toUpperCase(),
-          label: newLabel.trim(),
-          account_name: newAccountName.trim() || null,
-          account_number: newAccountNumber.trim() || null,
-          account_note: newAccountNote.trim() || null,
-          sort_order: Number(newSort) || 0,
+          ...result.value,
           is_active: true,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || 'Create failed');
+        await Swal.fire({ icon: 'error', title: 'Create failed', text: data.error || 'Create failed' });
         return;
       }
       setRows((prev) => [...prev, data.accountType]);
-      setNewCode('');
-      setNewLabel('');
-      setNewAccountName('');
-      setNewAccountNumber('');
-      setNewAccountNote('');
-      setNewSort('0');
+      await toast('success', `Added ${data.accountType?.code || result.value.code}`);
     } finally {
       setSavingId(null);
     }
@@ -120,24 +161,10 @@ export default function AccountTypesPage() {
       <p className="page-subtitle">ตั้งค่า Account Type แล้วเลือกใช้งานผ่าน dropdown ในหน้า Send Message</p>
 
       <div className="table-shell" style={{ padding: 14, marginBottom: 12 }}>
-        <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '120px 1fr 1fr 1fr 80px 80px' }}>
-          <input className="input" placeholder="CODE" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
-          <input className="input" placeholder="Label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
-          <input className="input" placeholder="Account Name (optional)" value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)} />
-          <input className="input" placeholder="Account Number (optional)" value={newAccountNumber} onChange={(e) => setNewAccountNumber(e.target.value)} />
-          <input className="input" type="number" placeholder="Sort" value={newSort} onChange={(e) => setNewSort(e.target.value)} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button type="button" className="btn btn-primary" onClick={createRow} disabled={savingId === 'new'}>
-            {savingId === 'new' ? 'Adding...' : 'Add'}
+            {savingId === 'new' ? 'Adding...' : 'Add Account Type'}
           </button>
-        </div>
-        <div style={{ marginTop: 8 }}>
-          <input
-            className="input"
-            style={{ width: '100%' }}
-            placeholder="Account Note — หมายเหตุสำหรับ footer (เช่น บัญชีโอนค่าสินค้า/ฝากจ่าย/ฝากโอน)"
-            value={newAccountNote}
-            onChange={(e) => setNewAccountNote(e.target.value)}
-          />
         </div>
       </div>
 

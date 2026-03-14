@@ -133,8 +133,8 @@ export default function SendMessagePage() {
   }, [templateType]);
 
   const autoBaseAmount = useMemo(() => {
-    if (templateType === 'IMPORT_INVOICE') {
-      const rate = exchangeRate.trim() ? toNum(exchangeRate) : 1;
+    if (templateType === 'CONFIRM') {
+      const rate = exchangeRate.trim() ? toNum(exchangeRate) : 0;
       return toNum(amount) * rate;
     }
     return toNum(amount);
@@ -217,8 +217,8 @@ export default function SendMessagePage() {
       receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
       accountType: accountType || undefined,
       amount: toNum(amount),
-      exchangeRate: templateType === 'IMPORT_INVOICE' ? (toNum(exchangeRate) || undefined) : undefined,
-      exchangeRateCurrency: templateType === 'IMPORT_INVOICE' ? exchangeRateCurrency : undefined,
+      exchangeRate: templateType === 'CONFIRM' ? (toNum(exchangeRate) || undefined) : undefined,
+      exchangeRateCurrency: templateType === 'CONFIRM' ? exchangeRateCurrency : undefined,
       totalAmount: summary.base,
       applyVat,
       applyWithholding,
@@ -327,8 +327,8 @@ export default function SendMessagePage() {
           receiptButtonLabel: templateType === 'RECEIPT' ? (receiptButtonLabel || undefined) : undefined,
           receiptButtonUrl: templateType === 'RECEIPT' ? (receiptButtonUrl || undefined) : undefined,
           amount: amount ? Number(amount) : undefined,
-          exchangeRate: templateType === 'IMPORT_INVOICE' && exchangeRate ? Number(exchangeRate) : undefined,
-          exchangeRateCurrency: templateType === 'IMPORT_INVOICE' ? exchangeRateCurrency : undefined,
+          exchangeRate: templateType === 'CONFIRM' && exchangeRate ? Number(exchangeRate) : undefined,
+          exchangeRateCurrency: templateType === 'CONFIRM' ? exchangeRateCurrency : undefined,
           totalAmount: summary.base || undefined,
           applyVat,
           applyWithholding,
@@ -638,10 +638,10 @@ export default function SendMessagePage() {
                   ))}
                 </select>
 
-                <label className="field-label">Amount</label>
+                <label className="field-label">Amount {templateType === 'CONFIRM' ? '(หยวน)' : '(บาท)'}</label>
                 <input className="input" style={{ width: '100%' }} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} step="0.01" />
 
-                {templateType === 'IMPORT_INVOICE' && (
+                {templateType === 'CONFIRM' && (
                   <>
                     <label className="field-label">Exchange Rate</label>
                     <div style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 110px' }}>

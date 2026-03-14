@@ -165,6 +165,11 @@ function fmtBaht(value) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} บาท`;
 }
 
+function fmtYuan(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} หยวน`;
+}
+
 function pickColor(value, fallback) {
   return /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : fallback;
 }
@@ -233,7 +238,7 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
   const amountText = data.templateType === 'IMPORT_INVOICE'
     ? fmtBaht(data.amount)
     : data.templateType === 'CONFIRM'
-      ? fmtBaht(data.amount)
+      ? fmtYuan(data.amount)
       : fmtBaht(data.amount);
 
   const rows = [];
@@ -248,7 +253,11 @@ function buildFlexMessage(data, orderCode, orderId, cfg, accountMeta = null) {
     );
   }
   if (!isCustomMessage && data.templateType === 'CONFIRM') {
+    const exchangeRateLabel = typeof data.exchangeRate === 'number'
+      ? `${parseFloat(data.exchangeRate.toFixed(2))} ${(data.exchangeRateCurrency || 'CNY')}`.trim()
+      : '-';
     rows.push(
+      [meta.detailLabels.exchangeRate, exchangeRateLabel],
       [meta.detailLabels.total, fmtBaht(data.totalAmount)],
     );
   }
@@ -449,9 +458,10 @@ router.post('/send', requireAuth, async (req, res) => {
   if (data.templateType === 'CONFIRM') {
     if (
       typeof data.amount !== 'number'
+      || typeof data.exchangeRate !== 'number'
     ) {
       return res.status(400).json({
-        error: 'CONFIRM requires amount',
+        error: 'CONFIRM requires amount and exchange rate',
       });
     }
   }
@@ -532,9 +542,9 @@ router.post('/send', requireAuth, async (req, res) => {
           data.templateType,
           data.accountType,
           data.amount,
-          null,
-          null,
-          data.netTotal ?? data.totalAmount ?? data.amount,
+          data.exchangeRate,
+          data.exchangeRateCurrency || 'CNY',
+          data.netTotal ?? data.totalAmount ?? (data.amount * data.exchangeRate),
           STAGE_BY_TEMPLATE[data.templateType],
         ],
       );
@@ -554,8 +564,8 @@ router.post('/send', requireAuth, async (req, res) => {
           data.templateType,
           data.accountType,
           data.amount,
-          data.exchangeRate,
-          data.exchangeRateCurrency || 'CNY',
+          null,
+          null,
           data.netTotal ?? data.totalAmount ?? data.amount,
           STAGE_BY_TEMPLATE[data.templateType],
         ],

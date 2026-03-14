@@ -169,6 +169,11 @@ function fmtBaht(value?: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} บาท`;
 }
 
+function fmtYuan(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} หยวน`;
+}
+
 function pickColor(value: string | null | undefined, fallback: string) {
   return /^#[0-9a-fA-F]{6}$/.test(value || '') ? String(value) : fallback;
 }
@@ -204,6 +209,8 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     receiptButtonUrl,
     accountType,
     amount,
+    exchangeRate,
+    exchangeRateCurrency,
     totalAmount,
     applyVat,
     applyWithholding,
@@ -228,7 +235,7 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
   const amountText = templateType === 'IMPORT_INVOICE'
     ? fmtBaht(amount)
     : templateType === 'CONFIRM'
-      ? fmtBaht(amount)
+      ? fmtYuan(amount)
       : fmtBaht(amount);
 
   type RowEntry = [string, string, boolean?]; // [label, value, isBankInfo?]
@@ -244,7 +251,11 @@ export function buildPreviewFlexMessage(input: PreviewInput) {
     );
   }
   if (!isCustomMessage && templateType === 'CONFIRM') {
+    const exchangeRateLabel = typeof exchangeRate === 'number'
+      ? `${parseFloat(exchangeRate.toFixed(2))} ${(exchangeRateCurrency || 'CNY')}`.trim()
+      : '-';
     rows.push(
+      [template.detail_exchange_rate_label, exchangeRateLabel],
       [template.detail_total_label, fmtBaht(totalAmount)],
     );
   }
