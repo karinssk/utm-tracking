@@ -480,6 +480,9 @@ export async function initDb() {
     await client.query(`
       ALTER TABLE landing_blocks ADD COLUMN IF NOT EXISTS block_height_px INTEGER;
     `);
+    await client.query(`
+      ALTER TABLE landing_blocks ADD COLUMN IF NOT EXISTS button_font_size_px INTEGER;
+    `);
     // Migrate constraint to include all block types
     await client.query(`
       ALTER TABLE landing_blocks DROP CONSTRAINT IF EXISTS landing_blocks_type_check;

@@ -29,7 +29,7 @@ function toPercent(value, fallback) {
 router.get('/', async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, sort_order
+      `SELECT id, type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, button_font_size_px, sort_order
        FROM landing_blocks
        WHERE is_active = TRUE
        ORDER BY sort_order ASC, id ASC`
@@ -45,7 +45,7 @@ router.get('/', async (_req, res) => {
 router.get('/all', requireAuth, async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, sort_order, is_active, created_at
+      `SELECT id, type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, button_font_size_px, sort_order, is_active, created_at
        FROM landing_blocks
        ORDER BY sort_order ASC, id ASC`
     );
@@ -59,7 +59,7 @@ router.get('/all', requireAuth, async (_req, res) => {
 // POST /api/landing-blocks — admin, create block
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px } = req.body;
+    const { type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, button_font_size_px } = req.body;
     if (!type || !ALLOWED_TYPES.includes(type)) {
       return res.status(400).json({ error: 'Invalid type' });
     }
@@ -71,9 +71,10 @@ router.post('/', requireAuth, async (req, res) => {
     const topPct = toPercent(button_top_pct, 44);
     const widthPct = toPercent(button_width_pct, 42);
     const heightPx = block_height_px != null ? parseInt(block_height_px, 10) || null : null;
+    const fontSizePx = button_font_size_px != null ? parseInt(button_font_size_px, 10) || null : null;
     const { rows } = await pool.query(
-      `INSERT INTO landing_blocks (type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO landing_blocks (type, image_url, label, button_url, button_left_pct, button_top_pct, button_width_pct, block_height_px, button_font_size_px, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         type,
@@ -84,6 +85,7 @@ router.post('/', requireAuth, async (req, res) => {
         topPct,
         widthPct,
         heightPx,
+        fontSizePx,
         sort_order,
       ]
     );
@@ -143,6 +145,7 @@ router.put('/:id', requireAuth, async (req, res) => {
     if ('button_top_pct' in body) { sets.push(`button_top_pct = $${idx++}`); params.push(toPercent(body.button_top_pct, 44)); }
     if ('button_width_pct' in body) { sets.push(`button_width_pct = $${idx++}`); params.push(toPercent(body.button_width_pct, 42)); }
     if ('block_height_px' in body) { sets.push(`block_height_px = $${idx++}`); params.push(body.block_height_px != null ? parseInt(body.block_height_px, 10) || null : null); }
+    if ('button_font_size_px' in body) { sets.push(`button_font_size_px = $${idx++}`); params.push(body.button_font_size_px != null ? parseInt(body.button_font_size_px, 10) || null : null); }
     if ('is_active' in body) { sets.push(`is_active = $${idx++}`); params.push(body.is_active); }
 
     if (sets.length === 0) return res.status(400).json({ error: 'No fields to update' });

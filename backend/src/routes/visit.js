@@ -22,7 +22,7 @@ router.post('/', async (req, res) => {
          (utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid, source_url, ip, user_agent)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING tracking_id`,
-      [utm_source, utm_medium, utm_campaign, utm_content, utm_term, fbclid || null, source_url, ip, userAgent],
+      [utm_source || 'organic', utm_medium || 'organic', utm_campaign, utm_content, utm_term, fbclid || null, source_url, ip, userAgent],
     );
 
     const { tracking_id } = result.rows[0];
