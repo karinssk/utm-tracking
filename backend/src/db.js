@@ -530,7 +530,7 @@ export async function initDb() {
       col1_lines: [
         'โกดังสายไหม-เพิ่มสิน เขตสายไหม',
         'กรุงเทพมหานคร',
-        'Line : @jawandacargo',
+        'Line : @pxc8977b',
         'Facebook : @jawandacargo',
         'TEL. 02-165-0162',
         'TEL. 099-420-7491',
@@ -540,7 +540,7 @@ export async function initDb() {
       col2_desc:  'ผู้ให้บริการสั่งของจากจีน นำเข้าสินค้าจากจีน ครบวงจร ประสบการณ์มากกว่า 10 ปี พร้อมให้คำปรึกษาฟรี ทีมงานไทย-จีนคอยดูแล',
       col3_title: 'ช่องทางการติดต่อ',
       col3_links: [
-        { label: 'สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: 'https://lin.ee/8NQIBi9',                        color: '#06c755' },
+        { label: 'สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: 'https://line.me/R/ti/p/%40pxc8977b',             color: '#06c755' },
         { label: 'ปรึกษาฟรีได้ที่ Facebook',         href: 'https://www.facebook.com/jawandacargo',        color: '#1877f2' },
         { label: 'สายด่วน 099-420-7491',              href: 'tel:0994207491',                               color: '#374151' },
       ],

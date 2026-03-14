@@ -56,6 +56,22 @@ type FooterCfg = {
   copyright: string;
 };
 
+const DEFAULT_LINE_OA_ID = '@pxc8977b';
+function buildLineAddFriendUrl(lineOaId?: string | null) {
+  const raw = String(lineOaId || DEFAULT_LINE_OA_ID).trim();
+  const normalized = raw.startsWith('@') ? raw : `@${raw}`;
+  return `https://line.me/R/ti/p/${encodeURIComponent(normalized)}`;
+}
+
+function syncFooterLineLink(footerCfg: FooterCfg, lineUrl: string): FooterCfg {
+  const nextLinks = (footerCfg.col3_links || []).map((link) => {
+    const isAddFriendLink = /เพิ่มเพื่อน|add friend/i.test(link.label || '')
+      || /lin\.ee|line\.me\/R\/ti\/p/i.test(link.href || '');
+    return isAddFriendLink ? { ...link, href: lineUrl } : link;
+  });
+  return { ...footerCfg, col3_links: nextLinks };
+}
+
 const DEFAULT_HEADER: HeaderCfg = {
   logo_url: '/logo.png',
   brand_name: 'JAWANDA CARGO',
@@ -75,7 +91,7 @@ const DEFAULT_FOOTER: FooterCfg = {
   col1_lines: [
     'โกดังสายไหม-เพิ่มสิน เขตสายไหม',
     'กรุงเทพมหานคร',
-    'Line : @jawandacargo',
+    `Line : ${DEFAULT_LINE_OA_ID}`,
     'Facebook : @jawandacargo',
     'TEL. 02-165-0162',
     'TEL. 099-420-7491',
@@ -85,7 +101,7 @@ const DEFAULT_FOOTER: FooterCfg = {
   col2_desc: 'ผู้ให้บริการสั่งของจากจีน นำเข้าสินค้าจากจีน ครบวงจร ประสบการณ์มากกว่า 10 ปี พร้อมให้คำปรึกษาฟรี ทีมงานไทย-จีนคอยดูแล',
   col3_title: 'ช่องทางการติดต่อ',
   col3_links: [
-    { label: 'สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: 'https://lin.ee/8NQIBi9',                  color: '#06c755' },
+    { label: 'สอบถาม / เพิ่มเพื่อน คลิกที่นี้', href: buildLineAddFriendUrl(DEFAULT_LINE_OA_ID), color: '#06c755' },
     { label: 'ปรึกษาฟรีได้ที่ Facebook',         href: 'https://www.facebook.com/jawandacargo', color: '#1877f2' },
     { label: 'สายด่วน 099-420-7491',              href: 'tel:0994207491',                        color: '#374151' },
   ],
@@ -105,8 +121,7 @@ function LandingInner() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [header, setHeader] = useState<HeaderCfg>(DEFAULT_HEADER);
   const [footer, setFooter] = useState<FooterCfg>(DEFAULT_FOOTER);
-
-  const LINE_OA_URL = 'https://lin.ee/8NQIBi9';
+  const [lineOaUrl, setLineOaUrl] = useState(buildLineAddFriendUrl(DEFAULT_LINE_OA_ID));
 
   useEffect(() => {
     document.body.style.background = '#f0f0f0';
@@ -144,8 +159,17 @@ function LandingInner() {
 
     fetch('/api/site-config/footer')
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => d && setFooter(d))
+      .then((d) => d && setFooter(syncFooterLineLink(d, lineOaUrl)))
       .catch(() => {});
+
+    fetch('/api/config')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        const url = buildLineAddFriendUrl(d?.lineOaId || DEFAULT_LINE_OA_ID);
+        setLineOaUrl(url);
+        setFooter((prev) => syncFooterLineLink(prev, url));
+      })
+      .catch(() => setLineOaUrl(buildLineAddFriendUrl(DEFAULT_LINE_OA_ID)));
   }, [searchParams]);
 
   async function handleAddFriend() {
@@ -159,7 +183,7 @@ function LandingInner() {
         });
       }
     } catch (err) { console.error('[pre-follow]', err); }
-    window.location.href = LINE_OA_URL;
+    window.location.href = lineOaUrl;
     setAdding(false);
   }
 
@@ -169,7 +193,7 @@ function LandingInner() {
       await handleAddFriend();
       return;
     }
-    const shouldTrack = /lin\.ee|line\.me/i.test(customUrl);
+    const shouldTrack = /lin\.ee|line\.me|line:\/\//i.test(customUrl);
     setAdding(true);
     try {
       if (shouldTrack && trackingId) {

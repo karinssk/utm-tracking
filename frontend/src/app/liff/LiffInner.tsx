@@ -4,6 +4,13 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 
 type Status = 'loading' | 'linking' | 'success' | 'error';
+const DEFAULT_LINE_OA_ID = '@pxc8977b';
+
+function buildLineAddFriendUrl(lineOaId?: string | null) {
+  const raw = String(lineOaId || DEFAULT_LINE_OA_ID).trim();
+  const normalized = raw.startsWith('@') ? raw : `@${raw}`;
+  return `https://line.me/R/ti/p/${encodeURIComponent(normalized)}`;
+}
 
 async function readJsonSafely(res: Response) {
   const text = await res.text();
@@ -18,6 +25,7 @@ export default function LiffInner() {
   const [status, setStatus] = useState<Status>('loading');
   const [message, setMessage] = useState('กำลังเชื่อมต่อ LINE...');
   const [showTestBtn, setShowTestBtn] = useState(false);
+  const [lineOaUrl, setLineOaUrl] = useState(buildLineAddFriendUrl(DEFAULT_LINE_OA_ID));
 
   useEffect(() => {
     let mounted = true;
@@ -34,9 +42,10 @@ export default function LiffInner() {
       try {
         const cfgRes = await fetch('/api/config');
         const cfg = await readJsonSafely(cfgRes);
-        if (!cfgRes.ok || !cfg?.liffId || !cfg?.lineOaId) {
+        if (!cfgRes.ok || !cfg?.liffId) {
           throw new Error(cfg?.error || `Config API failed (${cfgRes.status})`);
         }
+        setLineOaUrl(buildLineAddFriendUrl(cfg?.lineOaId || DEFAULT_LINE_OA_ID));
 
         const liff = (await import('@line/liff')).default;
         await liff.init({ liffId: cfg.liffId, withLoginOnExternalBrowser: true });
@@ -90,7 +99,7 @@ export default function LiffInner() {
   const icon = status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳';
 
   function handleTestBtnClick() {
-    const testUrl = 'https://lin.ee/8NQIBi9';
+    const testUrl = lineOaUrl;
     import('@line/liff')
       .then(({ default: liff }) => {
         if (liff.isInClient()) {

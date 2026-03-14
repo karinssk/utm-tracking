@@ -30,12 +30,6 @@ const NAV_SECTIONS = [
       { href: '/admin/site',    label: 'Site Settings',  icon: '⚙' },
     ],
   },
-  {
-    title: 'Developer',
-    items: [
-      { href: '/admin/dev', label: 'Dev Tools', icon: '⚠' },
-    ],
-  },
 ];
 
 type NavItem = { href: string; label: string; icon: string };
