@@ -10,12 +10,7 @@ const DIRECT_OA_UTM = {
   sourceUrl: 'line://oa',
 };
 
-const WELCOME_MESSAGE = `ยินดีต้อนรับสู่ Jawanda Cargo! 🎉
-
-ขอบคุณที่เพิ่มเราเป็นเพื่อนนะคะ 😊
-ทีมงานของเราพร้อมให้บริการด้านการขนส่งสินค้าอย่างรวดเร็วและปลอดภัย
-
-หากมีคำถามหรือต้องการสอบถามราคา ทักมาได้เลยค่ะ 📦`;
+const WELCOME_MESSAGE = `ยินดีต้อนรับสู่ Jawanda Cargo! `;
 
 function verifySignature(body, signature) {
   const secret = process.env.LINE_CHANNEL_SECRET;

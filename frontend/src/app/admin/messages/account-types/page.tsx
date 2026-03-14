@@ -19,6 +19,9 @@ export default function AccountTypesPage() {
   const [rows, setRows] = useState<AccountType[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<number | 'new' | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -104,14 +107,10 @@ export default function AccountTypesPage() {
               <input id="swal-account-number" class="input" placeholder="123-456-7890" style="width:100%;margin-top:6px" />
             </label>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 120px;gap:10px 12px;margin-top:10px">
+          <div style="display:grid;grid-template-columns:1fr;gap:10px 12px;margin-top:10px">
             <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
               Account Note
               <input id="swal-account-note" class="input" placeholder="ข้อความท้าย footer (ถ้ามี)" style="width:100%;margin-top:6px" />
-            </label>
-            <label style="display:block;font-size:12px;font-weight:700;color:#5f6780">
-              Sort
-              <input id="swal-account-sort" class="input" type="number" value="0" placeholder="0" style="width:100%;margin-top:6px" />
             </label>
           </div>
         </div>
@@ -129,7 +128,6 @@ export default function AccountTypesPage() {
         const nameEl = document.getElementById('swal-account-name') as HTMLInputElement | null;
         const numberEl = document.getElementById('swal-account-number') as HTMLInputElement | null;
         const noteEl = document.getElementById('swal-account-note') as HTMLInputElement | null;
-        const sortEl = document.getElementById('swal-account-sort') as HTMLInputElement | null;
 
         const code = (codeEl?.value || '').trim().toUpperCase();
         const label = (labelEl?.value || '').trim();
@@ -144,7 +142,6 @@ export default function AccountTypesPage() {
           account_name: (nameEl?.value || '').trim() || null,
           account_number: (numberEl?.value || '').trim() || null,
           account_note: (noteEl?.value || '').trim() || null,
-          sort_order: Number(sortEl?.value || 0) || 0,
         };
       },
     });
@@ -159,6 +156,7 @@ export default function AccountTypesPage() {
         credentials: 'include',
         body: JSON.stringify({
           ...result.value,
+          sort_order: rows.length,
           is_active: true,
         }),
       });
@@ -184,6 +182,55 @@ export default function AccountTypesPage() {
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
 
+  function reorderRows(sourceId: number, targetId: number) {
+    const sourceIndex = rows.findIndex((r) => r.id === sourceId);
+    const targetIndex = rows.findIndex((r) => r.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return rows;
+
+    const next = [...rows];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    return next.map((r, idx) => ({ ...r, sort_order: idx }));
+  }
+
+  async function persistSortOrder(nextRows: AccountType[]) {
+    setReordering(true);
+    try {
+      const results = await Promise.all(
+        nextRows.map(async (row, index) => {
+          const res = await fetch(`/api/account-types/${row.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ sort_order: index }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `Failed to reorder ${row.code}`);
+          return data.accountType as AccountType;
+        }),
+      );
+      setRows(results.sort((a, b) => a.sort_order - b.sort_order || a.id - b.id));
+      await toast('success', 'Reordered account types');
+    } catch (err) {
+      await Swal.fire({ icon: 'error', title: 'Reorder failed', text: (err as Error).message || 'Unable to save order' });
+      load();
+    } finally {
+      setReordering(false);
+      setDraggingId(null);
+      setDragOverId(null);
+    }
+  }
+
+  async function handleDrop(targetId: number) {
+    if (!draggingId || draggingId === targetId) {
+      setDragOverId(null);
+      return;
+    }
+    const next = reorderRows(draggingId, targetId);
+    setRows(next);
+    await persistSortOrder(next);
+  }
+
   return (
     <section>
       <h1 className="page-title">Account Type Config</h1>
@@ -191,10 +238,11 @@ export default function AccountTypesPage() {
 
       <div className="table-shell" style={{ padding: 14, marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <button type="button" className="btn btn-primary" onClick={createRow} disabled={savingId === 'new'}>
+          <button type="button" className="btn btn-primary" onClick={createRow} disabled={savingId === 'new' || reordering}>
             {savingId === 'new' ? 'Adding...' : 'Add Account Type'}
           </button>
         </div>
+        <p style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>ลากแถวด้วยปุ่ม <b>⋮⋮</b> เพื่อจัดลำดับ</p>
       </div>
 
       {loading ? (
@@ -204,12 +252,13 @@ export default function AccountTypesPage() {
           <table className="table">
             <thead>
               <tr>
+                <th style={{ width: 48, textAlign: 'center' }}>Drag</th>
                 <th>Code</th>
                 <th>Label</th>
                 <th>Account Name</th>
                 <th>Account Number</th>
                 <th style={{ minWidth: 220 }}>Account Note (footer)</th>
-                <th>Sort</th>
+                <th>Order</th>
                 <th>Active</th>
                 <th>Updated</th>
                 <th>Actions</th>
@@ -217,7 +266,19 @@ export default function AccountTypesPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  draggable={!reordering}
+                  onDragStart={() => setDraggingId(r.id)}
+                  onDragEnd={() => { setDraggingId(null); setDragOverId(null); }}
+                  onDragOver={(e) => { e.preventDefault(); if (!reordering) setDragOverId(r.id); }}
+                  onDrop={(e) => { e.preventDefault(); if (!reordering) handleDrop(r.id); }}
+                  style={{
+                    background: dragOverId === r.id ? '#eef5ff' : 'transparent',
+                    opacity: draggingId === r.id ? 0.55 : 1,
+                  }}
+                >
+                  <td style={{ textAlign: 'center', color: '#8a94a4', fontSize: 16, cursor: reordering ? 'not-allowed' : 'grab', userSelect: 'none' }}>⋮⋮</td>
                   <td><code>{r.code}</code></td>
                   <td>
                     <input className="input" style={{ width: '100%' }} value={r.label} onChange={(e) => patch(r.id, { label: e.target.value })} />
@@ -238,7 +299,7 @@ export default function AccountTypesPage() {
                     />
                   </td>
                   <td>
-                    <input className="input" style={{ width: 70 }} type="number" value={r.sort_order} onChange={(e) => patch(r.id, { sort_order: Number(e.target.value) || 0 })} />
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{r.sort_order + 1}</span>
                   </td>
                   <td>
                     <input type="checkbox" checked={r.is_active} onChange={(e) => patch(r.id, { is_active: e.target.checked })} />
@@ -246,10 +307,10 @@ export default function AccountTypesPage() {
                   <td>{new Date(r.updated_at).toLocaleString('th-TH')}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button type="button" className="btn btn-primary" style={{ height: 30, padding: '0 10px' }} disabled={savingId === r.id} onClick={() => save(r)}>
+                      <button type="button" className="btn btn-primary" style={{ height: 30, padding: '0 10px' }} disabled={savingId === r.id || reordering} onClick={() => save(r)}>
                         {savingId === r.id ? '...' : 'Save'}
                       </button>
-                      <button type="button" className="btn btn-soft" style={{ height: 30, padding: '0 10px' }} onClick={() => removeRow(r.id)}>
+                      <button type="button" className="btn btn-soft" style={{ height: 30, padding: '0 10px' }} disabled={reordering} onClick={() => removeRow(r.id)}>
                         Delete
                       </button>
                     </div>
@@ -258,7 +319,7 @@ export default function AccountTypesPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', color: '#8a94a4' }}>No data</td>
+                  <td colSpan={10} style={{ textAlign: 'center', color: '#8a94a4' }}>No data</td>
                 </tr>
               )}
             </tbody>
