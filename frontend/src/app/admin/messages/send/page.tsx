@@ -359,7 +359,7 @@ export default function SendMessagePage() {
           ${selectedOrder ? `<div><b>อ้างอิง Order:</b> ${selectedOrder.order_code}</div>` : ''}
           ${bodyIntroText ? `<div><b>Custom Body:</b> ${bodyIntroText.replace(/\n/g, '<br/>')}</div>` : ''}
           ${footerNote ? `<div><b>Custom Footer:</b> ${footerNote.replace(/\n/g, '<br/>')}</div>` : ''}
-          ${summary.netTotal ? `<div><b>ยอดสุทธิ:</b> ${money(summary.netTotal)}</div>` : ''}
+          ${templateType !== 'RECEIPT' && summary.netTotal ? `<div><b>ยอดสุทธิ:</b> ${money(summary.netTotal)}</div>` : ''}
         </div>
       `,
       icon: 'question',
